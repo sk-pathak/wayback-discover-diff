@@ -19,7 +19,7 @@ def register():
         error = 'Timestamp is required.'
     else:
         http = urllib3.PoolManager()
-        r = http.request('GET', f'https://web.archive.org/web/{timestamp}/{url}')
+        r = http.request('GET', 'https://web.archive.org/web/'+timestamp+'/'+url)
         if r.status == 200:
             simhash_result = {}
             simhash_result['simhash'] = Simhash(r.data.decode('utf-8')).value

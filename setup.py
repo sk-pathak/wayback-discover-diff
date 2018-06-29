@@ -9,6 +9,8 @@ setup(
     install_requires=[
         'Flask',
         'simhash',
+        'redis',
+        'urllib3',
         ],
     tests_require=[
         'pytest',

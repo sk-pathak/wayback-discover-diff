@@ -1,9 +1,8 @@
-import builtins
 from flask import (flash, jsonify)
 import urllib3
 import json
 from simhash import Simhash
-
+import redis
 
 class Discover(object):
 
@@ -39,16 +38,23 @@ class Discover(object):
             error = 'Year is required.'
         else:
             http = urllib3.PoolManager()
-            r = http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '}&'
+            r = http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '&'
                                         'from=' + year + '&to=' + year + '&fl=timestamp&output=json&output=json&limit=3')
             try:
                 snapshots = json.loads(r.data.decode('utf-8'))
+                if len(snapshots) == 0:
+                    raise ValueError
                 snapshots.pop(0)
                 simhashes = []
+                # create a connection to the localhost Redis server instance, by
+                # default it runs on port 6379
+                redis_db = redis.StrictRedis(host="localhost", port=6379, db=0)
                 for snapshot in snapshots:
                     r = http.request('GET', 'https://web.archive.org/web/' + snapshot[0] + '/' + url)
-                    simhashes.append(Simhash(r.data.decode('utf-8')).value)
-            except (json.decoder.JSONDecodeError, builtins.IndexError) as e:
+                    temp_simhash = Simhash(r.data.decode('utf-8')).value
+                    redis_db.set(url+snapshot[0], temp_simhash)
+                    simhashes.append(temp_simhash)
+            except (ValueError) as e:
                 return json.dumps({'Message': 'Failed to fetch snapshots, please try again.'})
         flash(error)
 

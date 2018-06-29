@@ -19,7 +19,7 @@ Install and update using pip:
 pip install -U Flask
 ```
 
-Using conda or another Python environment management system, select Python 3.6 to create a virtualenv and activate it:
+Using conda or another Python environment management system, select Python 3.4 to create a virtualenv and activate it:
 ```Shell
 python -m venv venv
 . venv/bin/activate

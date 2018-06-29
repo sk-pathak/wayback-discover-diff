@@ -1,6 +1,6 @@
 # wayback-discover-diff
 
-A Python 3 application running a web service that accepts HTTP GET requests and returns JSON:
+A Python 3.4 application running a web service that accepts HTTP GET requests and returns JSON:
 
 - /request?url=http://{URL}&year={YEAR}
 
@@ -14,15 +14,15 @@ Run background task to calculate simhash for all captures of target URL in the s
   
 ## Installing
 
-Install and update using pip:
-```Shell
-pip install -U Flask
-```
-
 Using conda or another Python environment management system, select Python 3.4 to create a virtualenv and activate it:
 ```Shell
 python -m venv venv
 . venv/bin/activate
+```
+
+Install and update using pip:
+```Shell
+python setup.py install
 ```
 
 ## Run

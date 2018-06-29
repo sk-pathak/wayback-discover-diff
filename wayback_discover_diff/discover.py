@@ -20,7 +20,7 @@ class Discover(object):
             redis_db = redis.StrictRedis(host="localhost", port=6379, db=0)
             results = redis_db.get(url + timestamp)
             if results is not None:
-                simhash_result = {'simhash': results}
+                simhash_result = {'simhash': results.decode('utf-8')}
             else:
                 simhash_result = {'simhash': 'None'}
         flash(error)

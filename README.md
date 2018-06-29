@@ -27,7 +27,7 @@ python -m venv venv
 
 ## Run
 ```
-export FLASK_APP=flaskr
+export FLASK_APP=wayback_discover_diff
 export FLASK_ENV=development
 flask run
 ```

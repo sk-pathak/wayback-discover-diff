@@ -28,7 +28,7 @@ class Discover(object):
         return simhash_result
 
     @staticmethod
-    def request_url(request):
+    def request_url(simhash_size, request):
         url = request.args.get('url')
         year = request.args.get('year')
         error = None
@@ -49,7 +49,7 @@ class Discover(object):
                 redis_db = redis.StrictRedis(host="localhost", port=6379, db=0)
                 for snapshot in snapshots:
                     r = http.request('GET', 'https://web.archive.org/web/' + snapshot[0] + '/' + url)
-                    temp_simhash = Simhash(r.data.decode('utf-8')).value
+                    temp_simhash = Simhash(r.data.decode('utf-8'), simhash_size).value
                     redis_db.set(url + snapshot[0], temp_simhash)
                     simhashes.append(temp_simhash)
             except (ValueError) as e:

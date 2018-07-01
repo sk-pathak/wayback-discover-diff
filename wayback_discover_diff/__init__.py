@@ -1,5 +1,6 @@
 import os
 from flask import (Flask, request)
+import yaml
 from .discover import Discover
 
 
@@ -9,6 +10,10 @@ def create_app(test_config=None):
     app.config.from_mapping(
         SECRET_KEY='dev',
     )
+
+    with open(os.environ['WAYBACK_DISCOVER_DIFF_CONF'], 'r') as ymlfile:
+        cfg = yaml.load(ymlfile)
+    simhash_size = cfg['simhash']['size']
 
     if test_config is None:
         # load the instance config, if it exists, when not testing
@@ -29,6 +34,6 @@ def create_app(test_config=None):
 
     @app.route('/request')
     def request_url():
-        return Discover.request_url(request)
+        return Discover.request_url(simhash_size, request)
 
     return app

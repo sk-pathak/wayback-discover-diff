@@ -35,7 +35,7 @@ def create_app(test_config=None):
     def simhash():
         return Discover.simhash(request)
 
-    @app.route('/request')
+    @app.route('/calculate-simhash')
     def request_url():
         return Discover.request_url(simhash_size, request, http)
 

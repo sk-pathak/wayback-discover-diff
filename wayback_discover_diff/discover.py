@@ -1,5 +1,4 @@
 from flask import (flash, jsonify)
-import urllib3
 import json
 from simhash import Simhash
 import redis
@@ -28,7 +27,7 @@ class Discover(object):
         return simhash_result
 
     @staticmethod
-    def request_url(simhash_size, request):
+    def request_url(simhash_size, request, http):
         url = request.args.get('url')
         year = request.args.get('year')
         error = None
@@ -37,7 +36,6 @@ class Discover(object):
         elif not year:
             error = 'Year is required.'
         else:
-            http = urllib3.PoolManager()
             r = http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '&'
                                                                                           'from=' + year + '&to=' + year + '&fl=timestamp&output=json&output=json&limit=3')
             try:

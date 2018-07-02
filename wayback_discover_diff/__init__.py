@@ -1,6 +1,7 @@
 import os
 from flask import (Flask, request)
 import yaml
+import urllib3
 from .discover import Discover
 
 
@@ -28,12 +29,14 @@ def create_app(test_config=None):
     except OSError:
         pass
 
+    http = urllib3.PoolManager()
+
     @app.route('/simhash')
     def simhash():
         return Discover.simhash(request)
 
     @app.route('/request')
     def request_url():
-        return Discover.request_url(simhash_size, request)
+        return Discover.request_url(simhash_size, request, http)
 
     return app

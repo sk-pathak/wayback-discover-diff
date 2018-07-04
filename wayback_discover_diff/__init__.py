@@ -50,7 +50,7 @@ def simhash():
 def request_url():
     url = request.args.get('url')
     year = request.args.get('year')
-    return jsonify({'Location': str(celery_calculate_simhash.apply_async(args=[url, year]))})
+    return jsonify({'status': 'started', 'job_id': str(celery_calculate_simhash.apply_async(args=[url, year]))})
 
 
 if __name__ == '__main__':

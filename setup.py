@@ -11,7 +11,8 @@ setup(
         'simhash',
         'redis',
         'urllib3',
-        'yaml',
+        'PyYAML',
+        'Celery',
         ],
     tests_require=[
         'pytest',

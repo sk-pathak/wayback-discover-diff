@@ -1,27 +1,26 @@
 import os
-from flask import (Flask, request)
+from flask import (Flask, request, jsonify)
 import yaml
-import urllib3
-from .discover import Discover
+from wayback_discover_diff.discover import Discover
+from celery import Celery
 
 
-def create_app(test_config=None):
+def create_app():
     # create and configure the app
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(
         SECRET_KEY='dev',
+    )
+    app.config.update(
+        CELERY_BROKER_URL='redis://localhost:6379',
+        CELERY_RESULT_BACKEND='redis://localhost:6379'
     )
 
     with open(os.environ['WAYBACK_DISCOVER_DIFF_CONF'], 'r') as ymlfile:
         cfg = yaml.load(ymlfile)
     simhash_size = cfg['simhash']['size']
 
-    if test_config is None:
-        # load the instance config, if it exists, when not testing
-        app.config.from_pyfile('config.py', silent=True)
-    else:
-        # load the test config if passed in
-        app.config.from_mapping(test_config)
+    app.config.from_pyfile('config.py', silent=True)
 
     # ensure  the instance folder exists
     try:
@@ -29,14 +28,28 @@ def create_app(test_config=None):
     except OSError:
         pass
 
-    http = urllib3.PoolManager()
+    # Initialize Celery
+    celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
+    celery.conf.update(app.config)
+
+    @celery.task(name='app')
+    def celery_calculate_simhash(url, year):
+        return Discover.request_url(simhash_size, url, year)
+
 
     @app.route('/simhash')
     def simhash():
-        return Discover.simhash(request)
+        url = request.args.get('url')
+        timestamp = request.args.get('timestamp')
+        return Discover.simhash(url, timestamp)
 
     @app.route('/calculate-simhash')
     def request_url():
-        return Discover.request_url(simhash_size, request, http)
+        url = request.args.get('url')
+        year = request.args.get('year')
+        return jsonify({'Location': str(celery_calculate_simhash.delay(url, year))})
 
+
+    # if __name__ == '__main__':
+    #     app.run(debug=True)
     return app

@@ -2,14 +2,13 @@ from flask import (flash, jsonify)
 import json
 from simhash import Simhash
 import redis
+import urllib3
 
 
 class Discover(object):
 
     @staticmethod
-    def simhash(request):
-        url = request.args.get('url')
-        timestamp = request.args.get('timestamp')
+    def simhash(url, timestamp):
         error = None
         if not url:
             error = 'URL is required.'
@@ -27,15 +26,14 @@ class Discover(object):
         return simhash_result
 
     @staticmethod
-    def request_url(simhash_size, request, http):
-        url = request.args.get('url')
-        year = request.args.get('year')
+    def request_url(simhash_size, url, year):
         error = None
         if not url:
-            error = 'URL is required.'
+            simhashes = 'URL is required.'
         elif not year:
-            error = 'Year is required.'
+            simhashes = 'Year is required.'
         else:
+            http = urllib3.PoolManager()
             r = http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '&'
                                                                                           'from=' + year + '&to=' + year + '&fl=timestamp&output=json&output=json&limit=3')
             try:
@@ -52,6 +50,5 @@ class Discover(object):
                     simhashes.append(temp_simhash)
             except (ValueError) as e:
                 return json.dumps({'Message': 'Failed to fetch snapshots, please try again.'})
-        flash(error)
 
         return jsonify(simhashes)

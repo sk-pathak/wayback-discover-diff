@@ -29,6 +29,7 @@ python setup.py install
 ```
 export FLASK_APP=wayback_discover_diff
 export FLASK_ENV=development
+export WAYBACK_DISCOVER_DIFF_CONF=wayback_discover_diff/conf.yml
 flask run
 ```
 

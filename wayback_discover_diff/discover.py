@@ -5,7 +5,7 @@ import redis
 import urllib3
 
 
-class Discover(object):
+class Discover():
 
     @staticmethod
     def simhash(url, timestamp):
@@ -25,8 +25,7 @@ class Discover(object):
         simhash_result = json.dumps(simhash_result)
         return simhash_result
 
-    @staticmethod
-    def request_url(simhash_size, url, year):
+    def request_url(self, simhash_size, url, year):
         error = None
         if not url:
             simhashes = 'URL is required.'
@@ -51,4 +50,4 @@ class Discover(object):
             except (ValueError) as e:
                 return json.dumps({'Message': 'Failed to fetch snapshots, please try again.'})
 
-        return jsonify(simhashes)
+        return json.dumps(simhashes)

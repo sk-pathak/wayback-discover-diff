@@ -3,6 +3,7 @@ from flask import (Flask, request, jsonify)
 import yaml
 from wayback_discover_diff.discover import Discover
 from celery import Celery
+import pdb
 
 
 # create and configure the app
@@ -32,9 +33,11 @@ celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 celery.conf.update(app.config)
 
 
-@celery.task(name='app')
-def celery_calculate_simhash(url, year):
-    return Discover.request_url(simhash_size, url, year)
+@celery.task(name='app', bind=True)
+def celery_calculate_simhash(self, url, year):
+    task = Discover.request_url(self, simhash_size, url, year)
+    pdb.set_trace()
+    return task.id
 
 
 @app.route('/simhash')

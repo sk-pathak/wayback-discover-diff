@@ -3,7 +3,6 @@ from flask import (Flask, request, jsonify)
 import yaml
 from wayback_discover_diff.discover import Discover
 from celery import Celery
-import pdb
 
 # def create_app():
 # create and configure the app
@@ -56,21 +55,18 @@ def request_url():
 def job_status():
     job_id = request.args.get('job_id')
     task = celery_calculate_simhash.AsyncResult(job_id)
-    # pdb.set_trace()
     if task.state == 'PENDING':
         # job did not start yet
         response = {
-            'state': task.state,
-            'current': task.info.get('current', 0),
-            'total': task.info.get('total', 1),
-            'status': task.info.get('status', '')
+            'status': task.state,
+            'job_id': task.info.get('job_id', 0),
+            'info': task.info.get('info', 1),
         }
     elif task.state != 'FAILURE':
         response = {
-            'state': task.state,
-            'current': task.info.get('current', 0),
-            'total': task.info.get('total', 1),
-            'status': task.info.get('status', '')
+            'status': task.state,
+            'job_id': task.info.get('job_id', 0),
+            'duration': task.info.get('duration', 1)
         }
         if 'result' in task.info:
             response['result'] = task.info['result']

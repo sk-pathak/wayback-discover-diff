@@ -26,7 +26,7 @@ python setup.py install
 ```
 
 ## Run
-In order to run this server you should run two components:
+In order to run this server a redis-server should be running and you should run two components:
 
 ### Flask
 Inside the root project folder run

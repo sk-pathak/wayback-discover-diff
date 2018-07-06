@@ -24,7 +24,12 @@ Install and update using pip:
 ```Shell
 python setup.py install
 ```
+Copy the conf.yml.example file to the same directory, removing the .example extension
 
+```
+cd wayback_discover_diff
+cp conf.yml.example conf.yml
+```
 ## Run
 In order to run this server a redis-server should be running and you should run two components:
 

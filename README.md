@@ -2,15 +2,19 @@
 
 A Python 3.4 application running a web service that accepts HTTP GET requests and returns JSON:
 
-- /request?url=http://{URL}&year={YEAR}
+- /calculate-simhash?url={URL}&year={YEAR}
 
-Run background task to calculate simhash for all captures of target URL in the specified year. **Right now this command only calculates the simhash for the first three captures of the year because it takes forever to download all the snapshots of a year.** 
+  Run background task to calculate simhash for all captures of target URL in the specified year. **Right now this command only calculates the simhash for the first thirty captures of the year for the sake of speed.** 
 
-  Return JSON {"simhash"}.
+  Return JSON {“status”: “started”, “job_id”: “XXYYZZ (uuid)”}
 
-- /simhash?url=http://{URL}&timestamp={timestamp}
+- /simhash?url={URL}&timestamp={timestamp}
   
-  Returns JSON {“simhash”: “XXXX”} if capture simhash can me calculated or None if it fails.
+  Returns JSON {“simhash”: “XXXX”} if capture simhash has already been calculated or None if it fails.
+  
+- /job?job_id=<job_Id>
+  
+  Returns JSON {“status”: “pending”, “job_Id”: “XXYYZZ”, “info”: “X out of Y captures have been processed”} the status of the job matching that specific job id
   
 ## Installing
 

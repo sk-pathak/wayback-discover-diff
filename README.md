@@ -44,7 +44,6 @@ Inside the wayback_discover_diff folder located in the project's root folder run
 ```
 export WAYBACK_DISCOVER_DIFF_CONF=conf.yml
 celery worker -A wayback_discover_diff.celery -l debug
-
 ```
 
 Open http://127.0.0.1:5000 in a browser.

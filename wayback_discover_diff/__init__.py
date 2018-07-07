@@ -3,6 +3,7 @@ from flask import (Flask, request, jsonify)
 import yaml
 from wayback_discover_diff.discover import Discover
 from celery import Celery
+from celery.result import AsyncResult
 
 # def create_app():
 # create and configure the app
@@ -21,52 +22,55 @@ simhash_size = cfg['simhash']['size']
 
 app.config.from_pyfile('config.py', silent=True)
 
+# NOTE it is a known issue that with the following we instantiate 2 Discovery
+# objects and create 2 Redis connections. There is certainly a way to have
+# only one. I couldn't find a way to run `app.discovery.simhash` in another way.
+app.discover = Discover(simhash_size)
+
 # ensure  the instance folder exists
 try:
     os.makedirs(app.instance_path)
 except OSError:
     pass
 
-# Initialize Celery
+# Initialize Celery and register Discover task.
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
 celery.conf.update(app.config)
-
-
-@celery.task(name='app', bind=True)
-def celery_calculate_simhash(self, url, year):
-    task = Discover.request_url(self, simhash_size, url, year)
-    return task
+celery.register_task(Discover(simhash_size))
 
 
 @app.route('/simhash')
 def simhash():
     url = request.args.get('url')
     timestamp = request.args.get('timestamp')
-    return Discover.simhash(url, timestamp)
+    return app.discover.simhash(url, timestamp)
 
 
 @app.route('/calculate-simhash')
 def request_url():
     url = request.args.get('url')
     year = request.args.get('year')
-    return jsonify({'status': 'started', 'job_id': str(celery_calculate_simhash.apply_async(args=[url, year]))})
+    return jsonify({'status': 'started', 'job_id': str(celery.tasks['Discover'].apply_async(args=[url, year]))})
 
 @app.route('/job')
 def job_status():
     job_id = request.args.get('job_id')
-    task = celery_calculate_simhash.AsyncResult(job_id)
+    task = AsyncResult(job_id, app=celery)
     if task.state == 'PENDING':
         # job did not start yet
         response = {
             'status': task.state,
-            'job_id': task.info.get('job_id', 0),
-            'info': task.info.get('info', 1),
+            'job_id': task.id
+            # TODO for some reason this doesn't work with my changes,
+            # I need to do this different? I didn't have the time to check
+            #'info': task.info.get('info', 1),
         }
     elif task.state != 'FAILURE':
         response = {
             'status': task.state,
-            'job_id': task.info.get('job_id', 0),
-            'duration': task.info.get('duration', 1)
+            'job_id': task.id
+            # TODO fix
+            #'duration': task.info.get('duration', 1)
         }
         if 'result' in task.info:
             response['result'] = task.info['result']

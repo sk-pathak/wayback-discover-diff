@@ -60,17 +60,14 @@ def job_status():
         # job did not start yet
         response = {
             'status': task.state,
-            'job_id': task.id
-            # TODO for some reason this doesn't work with my changes,
-            # I need to do this different? I didn't have the time to check
-            #'info': task.info.get('info', 1),
+            'job_id': task.id,
+            'info': task.info.get('info', 1)
         }
     elif task.state != 'FAILURE':
         response = {
             'status': task.state,
-            'job_id': task.id
-            # TODO fix
-            #'duration': task.info.get('duration', 1)
+            'job_id': task.id,
+            'duration': task.info.get('duration', 1)
         }
         if 'result' in task.info:
             response['result'] = task.info['result']

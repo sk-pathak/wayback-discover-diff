@@ -9,6 +9,7 @@ from celery import Task
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
 
+
 class Discover(Task):
     """Custom Celery Task class.
     http://docs.celeryproject.org/en/latest/userguide/tasks.html#custom-task-classes
@@ -16,16 +17,16 @@ class Discover(Task):
     name = 'Discover'
     task_id = None
 
-    def __init__(self, simhash_size):
-        self.simhash_size = simhash_size
-        # TODO we must configure the pool to do 3 retries on HTTP to handle
-        # potential wayback machine issues.
-        self.http = urllib3.PoolManager()
-        # TODO this must be configurable
-        self.redis_db = redis.StrictRedis(host="localhost", port=6379, db=0)
+    def __init__(self, cfg):
+        self.simhash_size = cfg['simhash']['size']
+        # TODO Do we also want to set the max number of redirects?
+        self.http = urllib3.PoolManager(retries=urllib3.Retry(3))
+        redis_host = cfg['redis']['host']
+        redis_port = cfg['redis']['port']
+        redis_db = cfg['redis']['db']
+        self.redis_db = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 
     def simhash(self, url, timestamp):
-        error = None
         if not url:
             return json.dumps({'error': 'URL is required.'})
         elif not timestamp:
@@ -39,7 +40,6 @@ class Discover(Task):
 
     def run(self, url, year):
         time_started = datetime.datetime.now()
-        error = None
         if not url:
             result = 'URL is required.'
         elif not year:
@@ -48,7 +48,7 @@ class Discover(Task):
             # TODO this must be inside the try/catch and HTTP exceptions must
             # be handled.
             r = self.http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '&'
-                                         'from=' + year + '&to=' + year + '&fl=timestamp&output=json&output=json&limit=30')
+                                          'from=' + year + '&to=' + year + '&fl=timestamp&output=json&output=json&limit=30')
             try:
                 snapshots = json.loads(r.data.decode('utf-8'))
                 total = len(snapshots)
@@ -64,7 +64,7 @@ class Discover(Task):
                     r = self.http.request('GET', 'https://web.archive.org/web/' + snapshot[0] + '/' + url)
                     temp_simhash = Simhash(r.data.decode('utf-8'), self.simhash_size).value
                     self.redis_db.set(url + snapshot[0], temp_simhash)
-            except (ValueError) as e:
+            except ValueError as e:
                 return json.dumps({'Message': 'Failed to fetch snapshots, please try again.'})
             time_ended = datetime.datetime.now()
             result = {'job_id': str(self.request.id), 'duration': str((time_ended - time_started).seconds)}

@@ -1,8 +1,8 @@
 import os
-from flask import (Flask, request, jsonify)
+from flask import (Flask, request, jsonify, json)
 import yaml
 from wayback_discover_diff.discover import Discover
-from celery import Celery
+from celery import (Celery, states)
 from celery.result import AsyncResult
 
 # create and configure the app
@@ -56,29 +56,28 @@ def request_url():
 def job_status():
     job_id = request.args.get('job_id')
     task = AsyncResult(job_id, app=celery)
-    if task.state == 'PENDING':
-        # job did not start yet
+    if task.state == states.PENDING:
+        # job did not finish yet
         response = {
             'status': task.state,
             'job_id': task.id,
             'info': task.info.get('info', 1)
         }
-    elif task.state != 'FAILURE':
-        response = {
-            'status': task.state,
-            'job_id': task.id,
-            'duration': task.info.get('duration', 1)
-        }
-        if 'result' in task.info:
-            response['result'] = task.info['result']
     else:
-        # something went wrong in the background job
-        response = {
-            'state': task.state,
-            'current': 1,
-            'total': 1,
-            'status': str(task.info),  # this is the exception raised
-        }
+        task_info = json.loads(task.info)
+        if task_info.get('status', 0) == 'error':
+            # something went wrong in the background job
+            response = {
+                'info': task_info.get('info',1),
+                'job_id': task.id,
+                'status': task_info.get('status', 0)
+            }
+        else:
+            response = {
+                'status': task.state,
+                'job_id': task.id,
+                'duration': task_info.get('duration', 1)
+            }
     return jsonify(response)
 
 

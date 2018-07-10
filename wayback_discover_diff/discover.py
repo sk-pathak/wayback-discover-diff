@@ -18,8 +18,7 @@ class Discover(Task):
 
     def __init__(self, cfg):
         self.simhash_size = cfg['simhash']['size']
-        # TODO Do we also want to set the max number of redirects?
-        self.http = urllib3.PoolManager(retries=urllib3.Retry(3))
+        self.http = urllib3.PoolManager(retries=urllib3.Retry(3, redirect=1))
         redis_host = cfg['redis']['host']
         redis_port = cfg['redis']['port']
         redis_db = cfg['redis']['db']

@@ -13,6 +13,7 @@ setup(
         'urllib3',
         'PyYAML',
         'Celery',
+        'gunicorn',
         ],
     tests_require=[
         'pytest',

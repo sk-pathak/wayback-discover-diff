@@ -45,6 +45,8 @@ class Discover(Task):
             result = 'Year is required.'
         else:
             try:
+                self.update_state(state='PENDING',
+                                  meta={'info': 'Fetching timestamps of ' + url + ' for year ' + year})
                 r = self.http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '&'
                                           'from=' + year + '&to=' + year + '&fl=timestamp&output=json&output=json&limit=3')
                 snapshots = json.loads(r.data.decode('utf-8'))
@@ -54,8 +56,7 @@ class Discover(Task):
                 snapshots.pop(0)
                 for i, snapshot in enumerate(snapshots):
                     self.update_state(state='PENDING',
-                                      meta={'job_id': self.request.id,
-                                            'info': str(i) + ' out of ' + str(total) + ' captures have been processed',
+                                      meta={'info': str(i) + ' out of ' + str(total) + ' captures have been processed',
                                             })
 
                     r = self.http.request('GET', 'https://web.archive.org/web/' + snapshot[0] + '/' + url)

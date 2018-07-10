@@ -35,24 +35,9 @@ cd wayback_discover_diff
 cp conf.yml.example conf.yml
 ```
 ## Run
-In order to run this server a redis-server should be running and you should run two components:
-
-### Flask
-Inside the root project folder run
-
+In order to run this server you should run :
 ```
-export FLASK_APP=wayback_discover_diff
-export FLASK_ENV=development
-export WAYBACK_DISCOVER_DIFF_CONF=wayback_discover_diff/conf.yml
-flask run
+bash run_gunicorn.sh
 ```
 
-### Celery
-Inside the wayback_discover_diff folder located in the project's root folder run 
-
-```
-export WAYBACK_DISCOVER_DIFF_CONF=conf.yml
-celery worker -A wayback_discover_diff.celery -l debug
-```
-
-Open http://127.0.0.1:5000 in a browser.
+Open http://127.0.0.1:4000 in a browser.

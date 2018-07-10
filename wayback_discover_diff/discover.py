@@ -31,7 +31,7 @@ class Discover(Task):
         elif not timestamp:
             return json.dumps({'error': 'Timestamp is required.'})
         else:
-            results = self.redis_db.get(url + timestamp)
+            results = self.redis_db.hget(url, timestamp)
             if results:
                 return json.dumps({'simhash': results.decode('utf-8')})
             else:
@@ -50,10 +50,10 @@ class Discover(Task):
                 r = self.http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '&'
                                           'from=' + year + '&to=' + year + '&fl=timestamp&output=json&output=json&limit=3')
                 snapshots = json.loads(r.data.decode('utf-8'))
+                snapshots.pop(0)
                 total = len(snapshots)
                 if total == 0:
                     raise ValueError
-                snapshots.pop(0)
                 for i, snapshot in enumerate(snapshots):
                     self.update_state(state='PENDING',
                                       meta={'info': str(i) + ' out of ' + str(total) + ' captures have been processed',
@@ -61,7 +61,7 @@ class Discover(Task):
 
                     r = self.http.request('GET', 'https://web.archive.org/web/' + snapshot[0] + '/' + url)
                     temp_simhash = Simhash(r.data.decode('utf-8'), self.simhash_size).value
-                    self.redis_db.set(url + snapshot[0], temp_simhash)
+                    self.redis_db.hset(url, snapshot[0], temp_simhash)
             except Exception as e:
                 result = {'status':'error', 'info': e.args[0]}
                 return json.dumps(result)

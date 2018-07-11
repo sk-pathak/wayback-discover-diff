@@ -4,6 +4,7 @@ import redis
 import urllib3
 import datetime
 from celery import Task
+import logging
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
@@ -22,18 +23,30 @@ class Discover(Task):
         redis_host = cfg['redis']['host']
         redis_port = cfg['redis']['port']
         redis_db = cfg['redis']['db']
+        self.logfile = cfg['logfile']
         self.redis_db = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
+
+        #Initialize logger
+        self._log = logging.getLogger(__name__)
+        logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s',
+                            filename=self.logfile, level=logging.INFO)
 
     def simhash(self, url, timestamp):
         if not url:
+            self._log.error('did not give url parameter')
             return json.dumps({'error': 'URL is required.'})
         elif not timestamp:
+            self._log.error('did not give timestamp parameter')
             return json.dumps({'error': 'Timestamp is required.'})
         else:
+            self._log.info('requesting redis db entry for %s %s', url, timestamp)
             results = self.redis_db.hget(url, timestamp)
             if results:
-                return json.dumps({'simhash': results.decode('utf-8')})
+                results = results.decode('utf-8')
+                self._log.info('found entry %s', results)
+                return json.dumps({'simhash': results})
             else:
+                self._log.info('entry not found')
                 return json.dumps({'simhash': 'None'})
 
     def run(self, url, year):

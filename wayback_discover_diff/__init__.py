@@ -10,7 +10,7 @@ app = Flask(__name__, instance_relative_config=True)
 app.config.from_mapping(
     SECRET_KEY='dev',
 )
-
+app.config.update(CELERYD_HIJACK_ROOT_LOGGER=False)
 with open(os.environ['WAYBACK_DISCOVER_DIFF_CONF'], 'r') as ymlfile:
     cfg = yaml.load(ymlfile)
 

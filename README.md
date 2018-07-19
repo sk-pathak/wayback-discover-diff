@@ -41,3 +41,9 @@ bash run_gunicorn.sh
 ```
 
 Open http://127.0.0.1:4000 in a browser.
+
+## Tests
+In order to run the tests call the script:
+```
+bash run_tests.sh
+```

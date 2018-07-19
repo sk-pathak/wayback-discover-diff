@@ -14,6 +14,7 @@ setup(
         'PyYAML',
         'Celery',
         'gunicorn',
+        'pytest',
         ],
     tests_require=[
         'pytest',

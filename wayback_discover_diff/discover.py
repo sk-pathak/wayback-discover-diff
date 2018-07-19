@@ -89,10 +89,10 @@ class Discover(Task):
             except Exception as e:
                 self._task_log.error(e.args[0])
                 result = {'status':'error', 'info': e.args[0]}
-                return json.dumps(result)
+                return json.dumps(result, sort_keys=True)
             time_ended = datetime.datetime.now()
             result = {'duration': str((time_ended - time_started).seconds)}
             self._task_log.info('calculate simhash ended with duration: %d', (time_ended - time_started).seconds)
-            return json.dumps(result)
-        return json.dumps(result)
+            return json.dumps(result, sort_keys=True)
+        return json.dumps(result, sort_keys=True)
 

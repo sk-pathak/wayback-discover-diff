@@ -66,3 +66,9 @@ def test_task_no_snapshots():
     job = celery.tasks['Discover'].apply(args=[url, year])
     assert job.get() == json.dumps({'status':'error', 'info': 'no snapshots found for this year and url combination'})
 
+def test_success_calc_simhash():
+    url = 'iskme.org'
+    year = '2018'
+    job = celery.tasks['Discover'].apply(args=[url, year])
+    task_info = json.loads(job.info)
+    assert task_info.get('duration', -1) != -1

@@ -39,11 +39,11 @@ def test_no_entry():
     assert json.dumps({'simhash': 'None'}) == result
 
 
-def test_start_task():
-    url = 'iskme.org'
-    year = '2018'
-    job_id = celery.tasks['Discover'].apply_async(args=[url, year])
-    assert job_id is not None
+# def test_start_task():
+#     url = 'iskme.org'
+#     year = '2018'
+#     job_id = celery.tasks['Discover'].apply(args=[url, year])
+#     assert job_id is not None
 
 
 def test_task_no_url():
@@ -58,3 +58,11 @@ def test_task_no_year():
     year = None
     job = celery.tasks['Discover'].apply(args=[url, year])
     assert job.get() == json.dumps({'status':'error', 'info': 'Year is required.'})
+
+
+def test_task_no_snapshots():
+    url = 'nonexistingdomain.org'
+    year = '2018'
+    job = celery.tasks['Discover'].apply(args=[url, year])
+    assert job.get() == json.dumps({'status':'error', 'info': 'no snapshots found for this year and url combination'})
+

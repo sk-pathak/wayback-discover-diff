@@ -70,11 +70,12 @@ class Discover(Task):
                                           'from=' + year + '&to=' + year + '&fl=timestamp&output=json&output=json&limit=3')
                 self._task_log.info('finished fetching timestamps of %s for year %s', url, year)
                 snapshots = json.loads(r.data.decode('utf-8'))
+                if len(snapshots) == 0:
+                    self._task_log.error('no snapshots found for this year and url combination')
+                    result = {'status':'error', 'info': 'no snapshots found for this year and url combination'}
+                    return json.dumps(result, sort_keys=True)
                 snapshots.pop(0)
                 total = len(snapshots)
-                if total == 0:
-                    self._task_log.error('no snapshots found for this year and url combination')
-                    raise ValueError
                 for i, snapshot in enumerate(snapshots):
                     self._task_log.info('fetching snapshot %d out of %d', i, total)
                     self.update_state(state='PENDING',

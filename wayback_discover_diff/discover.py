@@ -84,7 +84,7 @@ class Discover(Task):
 
                     r = self.http.request('GET', 'https://web.archive.org/web/' + snapshot[0] + '/' + url)
                     self._task_log.info('calculating simhash for snapshot %d out of %d', i, total)
-                    temp_simhash = Simhash(r.data.decode('utf-8'), self.simhash_size).value
+                    temp_simhash = Simhash(r.data.decode('utf-8', 'ignore'), self.simhash_size).value
                     self._task_log.info('saving to redis simhash for snapshot %d out of %d', i, total)
                     self.redis_db.hset(url, snapshot[0], temp_simhash)
             except Exception as e:

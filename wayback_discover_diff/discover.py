@@ -67,7 +67,7 @@ class Discover(Task):
                 self.update_state(state='PENDING',
                                   meta={'info': 'Fetching timestamps of ' + url + ' for year ' + year})
                 r = self.http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '&'
-                                          'from=' + year + '&to=' + year + '&fl=timestamp&output=json&output=json&limit=3')
+                                          'from=' + year + '&to=' + year + '&fl=timestamp&output=json&output=json')
                 self._task_log.info('finished fetching timestamps of %s for year %s', url, year)
                 snapshots = json.loads(r.data.decode('utf-8'))
                 if len(snapshots) == 0:

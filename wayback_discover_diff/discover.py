@@ -7,6 +7,9 @@ from celery import Task
 import logging
 from celery.utils.log import get_task_logger
 import concurrent.futures
+from celery.contrib import rdb
+
+import cProfile
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
@@ -55,17 +58,24 @@ class Discover(Task):
 
     def fetch_snapshot(self, snapshot, url, i, total):
         self._task_log.info('fetching snapshot %d out of %d', i, total)
-        # self.update_state(state='PENDING',
-        #                   meta={'info': str(i) + ' out of ' + str(total) + ' captures have been processed',
-        #                         })
-        self._task_log.info('**************simhash')
+        # rdb.set_trace()
+        # self.update_state(task_id= self.request.id, state='PENDING', meta={'info': ' captures have been processed'})
+        self._task_log.info('**************simhash ')
         r = self.http.request('GET', 'https://web.archive.org/web/' + snapshot[0] + '/' + url)
         self._task_log.info('calculating simhash for snapshot %d out of %d', i, total)
-        temp_simhash = Simhash(r.data.decode('utf-8', 'ignore'), self.simhash_size).value
+        temp_simhash = self.cal_sim(r)
         self._task_log.info(temp_simhash)
         return [url, snapshot, temp_simhash]
 
+    def cal_sim(self, r):
+        return Simhash(r.data.decode('utf-8', 'ignore'), self.simhash_size).value
+
     def run(self, url, year):
+        # rdb.set_trace()
+        cProfile.runctx('self.to_track(url, year)', globals=globals(), locals=locals(), filename='profile.prof')
+
+
+    def to_track(self, url, year):
         time_started = datetime.datetime.now()
         self._task_log.info('calculate simhash started')
         if not url:
@@ -80,16 +90,16 @@ class Discover(Task):
                 self.update_state(state='PENDING',
                                   meta={'info': 'Fetching timestamps of ' + url + ' for year ' + year})
                 r = self.http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '&'
-                                          'from=' + year + '&to=' + year + '&fl=timestamp&output=json')
+                                          'from=' + year + '&to=' + year + '&fl=timestamp&output=json&limit=20')
                 self._task_log.info('finished fetching timestamps of %s for year %s', url, year)
                 snapshots = json.loads(r.data.decode('utf-8'))
+
                 if len(snapshots) == 0:
                     self._task_log.error('no snapshots found for this year and url combination')
                     result = {'status':'error', 'info': 'no snapshots found for this year and url combination'}
                     return json.dumps(result, sort_keys=True)
                 snapshots.pop(0)
                 total = len(snapshots)
-
                 with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
                     # Start the load operations and mark each future with its URL
                     future_to_url = {executor.submit(self.fetch_snapshot, snapshot, url, 1, total): snapshot for snapshot in snapshots}
@@ -98,7 +108,7 @@ class Discover(Task):
                         try:
                             [url, snapshot, data] = future.result()
                         except Exception as exc:
-                            print('%r generated an exception: %s' % (url, exc))
+                            self._task_log.error(exc)
                         else:
                             self._task_log.info('saving to redis simhash for snapshot %d out of %d', 1, total)
                             self.redis_db.hset(url, snapshot[0], data)

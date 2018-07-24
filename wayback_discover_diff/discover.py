@@ -56,26 +56,29 @@ class Discover(Task):
                 self._log.info('entry not found')
                 return json.dumps({'simhash': 'None'})
 
-    def fetch_snapshot(self, snapshot, url, i, total):
+    def download_snapshot(self, snapshot, url, i, total):
         self._task_log.info('fetching snapshot %d out of %d', i, total)
         # rdb.set_trace()
         # self.update_state(task_id= self.request.id, state='PENDING', meta={'info': ' captures have been processed'})
-        self._task_log.info('**************simhash ')
         r = self.http.request('GET', 'https://web.archive.org/web/' + snapshot[0] + '/' + url)
         self._task_log.info('calculating simhash for snapshot %d out of %d', i, total)
-        temp_simhash = self.cal_sim(r)
-        self._task_log.info(temp_simhash)
-        return [url, snapshot, temp_simhash]
+        return r
 
-    def cal_sim(self, r):
-        return Simhash(r.data.decode('utf-8', 'ignore'), self.simhash_size).value
+    def start_simhash_import(self, snapshot, url, i, total):
+        cProfile.runctx('self.get_calc_save(snapshot, url, i, total)', globals=globals(), locals=locals(), filename='profile.prof')
+
+    def get_calc_save(self, snapshot, url, i, total):
+        data = self.download_snapshot(snapshot, url, i, total)
+        simhash = self.calculate_simhash(data)
+        self.save_to_redis(url, snapshot, simhash, total)
+
+    def calculate_simhash(self, r):
+        temp_simhash = Simhash(r.data.decode('utf-8', 'ignore'), self.simhash_size).value
+        self._task_log.info(temp_simhash)
+        return temp_simhash
 
     def run(self, url, year):
         # rdb.set_trace()
-        cProfile.runctx('self.to_track(url, year)', globals=globals(), locals=locals(), filename='profile.prof')
-
-
-    def to_track(self, url, year):
         time_started = datetime.datetime.now()
         self._task_log.info('calculate simhash started')
         if not url:
@@ -90,7 +93,7 @@ class Discover(Task):
                 self.update_state(state='PENDING',
                                   meta={'info': 'Fetching timestamps of ' + url + ' for year ' + year})
                 r = self.http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '&'
-                                          'from=' + year + '&to=' + year + '&fl=timestamp&output=json&limit=20')
+                                                                                                   'from=' + year + '&to=' + year + '&fl=timestamp&output=json&limit=20')
                 self._task_log.info('finished fetching timestamps of %s for year %s', url, year)
                 snapshots = json.loads(r.data.decode('utf-8'))
 
@@ -102,29 +105,13 @@ class Discover(Task):
                 total = len(snapshots)
                 with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
                     # Start the load operations and mark each future with its URL
-                    future_to_url = {executor.submit(self.fetch_snapshot, snapshot, url, 1, total): snapshot for snapshot in snapshots}
+                    #TODO: Fix snapshot number
+                    future_to_url = {executor.submit(self.start_simhash_import, snapshot, url, 1, total): snapshot for snapshot in snapshots}
                     for future in concurrent.futures.as_completed(future_to_url):
-                        url = future_to_url[future]
                         try:
-                            [url, snapshot, data] = future.result()
+                            future.result()
                         except Exception as exc:
                             self._task_log.error(exc)
-                        else:
-                            self._task_log.info('saving to redis simhash for snapshot %d out of %d', 1, total)
-                            self.redis_db.hset(url, snapshot[0], data)
-
-
-                # for i, snapshot in enumerate(snapshots):
-                #     self._task_log.info('fetching snapshot %d out of %d', i, total)
-                #     self.update_state(state='PENDING',
-                #                      meta={'info': str(i) + ' out of ' + str(total) + ' captures have been processed',
-                #                             })
-                #
-                #     r = self.http.request('GET', 'https://web.archive.org/web/' + snapshot[0] + '/' + url)
-                #     self._task_log.info('calculating simhash for snapshot %d out of %d', i, total)
-                #     temp_simhash = Simhash(r.data.decode('utf-8', 'ignore'), self.simhash_size).value
-                #     self._task_log.info('saving to redis simhash for snapshot %d out of %d', i, total)
-                #     self.redis_db.hset(url, snapshot[0], temp_simhash)
             except Exception as e:
                 self._task_log.error(e.args[0])
                 result = {'status':'error', 'info': e.args[0]}
@@ -134,4 +121,10 @@ class Discover(Task):
             self._task_log.info('calculate simhash ended with duration: %d', (time_ended - time_started).seconds)
             return json.dumps(result, sort_keys=True)
         return json.dumps(result, sort_keys=True)
+
+    def save_to_redis(self, url, snapshot, data, total):
+        #TODO: Fix snapshot number
+        self._task_log.info('saving to redis simhash for snapshot %d out of %d', 1, total)
+        self.redis_db.hset(url, snapshot[0], data)
+
 

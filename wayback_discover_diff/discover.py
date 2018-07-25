@@ -60,7 +60,7 @@ class Discover(Task):
         self._task_log.info('fetching snapshot %d out of %d', i, total)
         # rdb.set_trace()
         # self.update_state(task_id= self.request.id, state='PENDING', meta={'info': ' captures have been processed'})
-        r = self.http.request('GET', 'https://web.archive.org/web/' + snapshot[0] + '/' + url)
+        r = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + '/' + url)
         self._task_log.info('calculating simhash for snapshot %d out of %d', i, total)
         return r
 
@@ -92,8 +92,8 @@ class Discover(Task):
                 self._task_log.info('fetching timestamps of %s for year %s', url, year)
                 self.update_state(state='PENDING',
                                   meta={'info': 'Fetching timestamps of ' + url + ' for year ' + year})
-                r = self.http.request('GET', 'https://web.archive.org/cdx/search/cdx?url=' + url + '&'
-                                                                                                   'from=' + year + '&to=' + year + '&fl=timestamp&output=json&limit=20')
+                r = self.http.request('GET', 'http://web.archive.org/cdx/search/cdx?url=' + url + '&'
+                                                                                                   'from=' + year + '&to=' + year + '&fl=timestamp&output=json')
                 self._task_log.info('finished fetching timestamps of %s for year %s', url, year)
                 snapshots = json.loads(r.data.decode('utf-8'))
 

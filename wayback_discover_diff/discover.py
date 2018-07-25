@@ -8,7 +8,7 @@ import logging
 from celery.utils.log import get_task_logger
 import concurrent.futures
 from celery.contrib import rdb
-
+import xxhash
 import cProfile
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
@@ -73,7 +73,8 @@ class Discover(Task):
         self.save_to_redis(url, snapshot, simhash, total)
 
     def calculate_simhash(self, r):
-        temp_simhash = Simhash(r.data.decode('utf-8', 'ignore'), self.simhash_size).value
+        # rdb.set_trace()
+        temp_simhash = Simhash(r.data.decode('utf-8', 'ignore'), self.simhash_size, hashfunc=hash_function).value
         self._task_log.info(temp_simhash)
         return temp_simhash
 
@@ -127,4 +128,7 @@ class Discover(Task):
         self._task_log.info('saving to redis simhash for snapshot %d out of %d', 1, total)
         self.redis_db.hset(url, snapshot[0], data)
 
+
+def hash_function(x):
+    return int(xxhash.xxh64(x).hexdigest(), 16)
 

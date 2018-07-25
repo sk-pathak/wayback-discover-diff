@@ -15,6 +15,7 @@ setup(
         'Celery',
         'gunicorn',
         'pytest',
+        'xxhash',
         ],
     tests_require=[
         'pytest',

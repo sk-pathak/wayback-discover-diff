@@ -16,6 +16,8 @@ setup(
         'gunicorn',
         'pytest',
         'xxhash',
+        'beautifulsoup4',
+        'lxml',
         ],
     tests_require=[
         'pytest',

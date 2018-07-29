@@ -4,7 +4,7 @@ A Python 3.4 application running a web service that accepts HTTP GET requests an
 
 - /calculate-simhash?url={URL}&year={YEAR}
 
-  Run background task to calculate simhash for all captures of target URL in the specified year. **Right now this command only calculates the simhash for the first thirty captures of the year for the sake of speed.** 
+  Run background task to calculate simhash for all captures of target URL in the specified year.
 
   Return JSON {“status”: “started”, “job_id”: “XXYYZZ (uuid)”}
 

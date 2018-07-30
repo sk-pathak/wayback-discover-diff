@@ -71,10 +71,11 @@ class Discover(Task):
 
     def get_calc_save(self, snapshot, url, i, total):
         data = self.download_snapshot(snapshot, url, i, total)
+        data = self.calc_features(data)
         simhash = self.calculate_simhash(data)
         self.save_to_redis(url, snapshot, simhash, total)
 
-    def calculate_simhash(self, r):
+    def calc_features(self, r):
         soup = BeautifulSoup(r.data.decode('utf-8', 'ignore'))
 
         # kill all script and style elements
@@ -96,6 +97,9 @@ class Discover(Task):
 
         text = {k:sum(1 for _ in g) for k, g in groupby(sorted(text))}
 
+        return text
+
+    def calculate_simhash(self, text):
         temp_simhash = Simhash(text, self.simhash_size, hashfunc=hash_function).value
         self._task_log.info(temp_simhash)
         return temp_simhash

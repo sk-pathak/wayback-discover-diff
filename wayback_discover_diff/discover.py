@@ -71,14 +71,14 @@ class Discover(Task):
             self._log.info('requesting redis db entry for %s %s', url, year)
             results = self.redis_db.hkeys(url)
             if results:
-                available_simhashes = {'timestamp':'simhash'}
+                available_simhashes = []
                 for timestamp in results:
                     timestamp = timestamp.decode('UTF-8')
                     timestamp_year = timestamp[:4]
                     if timestamp_year == str(year):
                         simhash = self.redis_db.hget(url, timestamp).decode('utf-8')
-                        available_simhashes[timestamp] = simhash
-                self._log.info('found entry %s', timestamp)
+                        available_simhashes.append({'timestamp': timestamp, 'simhash': simhash})
+                    self._log.info('found entry %s', timestamp)
                 return json.dumps(available_simhashes)
             else:
                 self._log.info('No simhases for this URL and Year')

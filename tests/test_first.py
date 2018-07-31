@@ -21,21 +21,21 @@ celery.register_task(app)
 def test_no_url():
     url = None
     timestamp = '20141115130953'
-    result = app.simhash(url, timestamp)
+    result = app.timestamp_simhash(url, timestamp)
     assert json.dumps({'error': 'URL is required.'}) == result
 
 
 def test_no_timestamp():
     url = 'iskme.org'
     timestamp = None
-    result = app.simhash(url, timestamp)
+    result = app.timestamp_simhash(url, timestamp)
     assert json.dumps({'error': 'Timestamp is required.'}) == result
 
 
 def test_no_entry():
     url = 'nonexistingdomain.org'
     timestamp = '20180000000000'
-    result = app.simhash(url, timestamp)
+    result = app.timestamp_simhash(url, timestamp)
     assert json.dumps({'simhash': 'None'}) == result
 
 

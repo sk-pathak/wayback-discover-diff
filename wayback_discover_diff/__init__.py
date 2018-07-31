@@ -42,7 +42,10 @@ celery.register_task(Discover(cfg))
 def simhash():
     url = request.args.get('url')
     timestamp = request.args.get('timestamp')
-    return app.discover.simhash(url, timestamp)
+    if not timestamp:
+        year = request.args.get('year')
+        return app.discover.year_simhash(url, year)
+    return app.discover.timestamp_simhash(url, timestamp)
 
 
 @app.route('/calculate-simhash')

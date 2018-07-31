@@ -42,7 +42,7 @@ class Discover(Task):
         #Initialize Task logger
         self._task_log = get_task_logger(__name__)
 
-    def simhash(self, url, timestamp):
+    def timestamp_simhash(self, url, timestamp):
         if not url:
             self._log.error('did not give url parameter')
             return json.dumps({'error': 'URL is required.'})
@@ -58,6 +58,30 @@ class Discover(Task):
                 return json.dumps({'simhash': results})
             else:
                 self._log.info('entry not found')
+                return json.dumps({'simhash': 'None'})
+
+    def year_simhash(self, url, year):
+        if not url:
+            self._log.error('did not give url parameter')
+            return json.dumps({'error': 'URL is required.'})
+        elif not year:
+            self._log.error('did not give year parameter')
+            return json.dumps({'error': 'Year is required.'})
+        else:
+            self._log.info('requesting redis db entry for %s %s', url, year)
+            results = self.redis_db.hkeys(url)
+            if results:
+                available_simhashes = {'timestamp':'simhash'}
+                for timestamp in results:
+                    timestamp = timestamp.decode('UTF-8')
+                    timestamp_year = timestamp[:4]
+                    if timestamp_year == str(year):
+                        simhash = self.redis_db.hget(url, timestamp).decode('utf-8')
+                        available_simhashes[timestamp] = simhash
+                self._log.info('found entry %s', timestamp)
+                return json.dumps(available_simhashes)
+            else:
+                self._log.info('No simhases for this URL and Year')
                 return json.dumps({'simhash': 'None'})
 
     def download_snapshot(self, snapshot, url, i, total):

@@ -12,3 +12,8 @@ test_redis:
     db: 0
 
 logfile: log.txt
+
+threads: 8
+
+snapshots:
+    number_per_year: -1

@@ -31,6 +31,8 @@ class Discover(Task):
         redis_port = cfg['redis']['port']
         redis_db = cfg['redis']['db']
         self.logfile = cfg['logfile']
+        self.thread_number = cfg['threads']
+        self.snapshots_number = cfg['snapshots']['number_per_year']
         self.redis_db = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 
         #Initialize logger
@@ -119,8 +121,10 @@ class Discover(Task):
                 self._task_log.info('fetching timestamps of %s for year %s', url, year)
                 self.update_state(state='PENDING',
                                   meta={'info': 'Fetching timestamps of ' + url + ' for year ' + year})
-                r = self.http.request('GET', 'http://web.archive.org/cdx/search/cdx?url=' + url + '&'
-                                                                                                   'from=' + year + '&to=' + year + '&fl=timestamp&output=json')
+                wayback_url = 'http://web.archive.org/cdx/search/cdx?url=' + url + '&' + 'from=' + year + '&to=' + year + '&fl=timestamp&output=json'
+                if self.snapshots_number != -1:
+                    wayback_url += '&limit=' + str(self.snapshots_number)
+                r = self.http.request('GET', wayback_url)
                 self._task_log.info('finished fetching timestamps of %s for year %s', url, year)
                 snapshots = json.loads(r.data.decode('utf-8'))
 
@@ -130,7 +134,7 @@ class Discover(Task):
                     return json.dumps(result, sort_keys=True)
                 snapshots.pop(0)
                 total = len(snapshots)
-                with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=self.thread_number) as executor:
                     # Start the load operations and mark each future with its URL
                     #TODO: Fix snapshot number
                     future_to_url = {executor.submit(self.start_simhash_import, snapshot, url, 1, total): snapshot for snapshot in snapshots}

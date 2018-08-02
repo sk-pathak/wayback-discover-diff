@@ -13,7 +13,7 @@ OPTS=(
 )
 
 #Run gunicorn
-gunicorn "${OPTS[@]}" wayback_discover_diff:app &
+gunicorn "${OPTS[@]}" wayback_discover_diff:APP &
 
 #Run celery worker
 cd wayback_discover_diff

@@ -152,7 +152,7 @@ class Discover(Task):
                 self._task_log.info('finished fetching timestamps of %s for year %s', url, year)
                 snapshots = json.loads(response.data.decode('utf-8'))
 
-                if snapshots:
+                if not snapshots:
                     self._task_log.error('no snapshots found for this year and url combination')
                     result = {'status': 'error',
                               'info': 'no snapshots found for this year and url combination'}

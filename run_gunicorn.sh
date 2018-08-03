@@ -17,4 +17,4 @@ gunicorn "${OPTS[@]}" wayback_discover_diff:APP &
 
 #Run celery worker
 cd wayback_discover_diff
-WAYBACK_DISCOVER_DIFF_CONF=conf.yml celery worker -A wayback_discover_diff.celery -l debug
+WAYBACK_DISCOVER_DIFF_CONF=conf.yml celery worker -A wayback_discover_diff.CELERY -l debug

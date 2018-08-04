@@ -11,6 +11,7 @@ from celery import Task
 import urllib3
 import redis
 from simhash import Simhash
+from celery.contrib import rdb
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
@@ -82,22 +83,22 @@ class Discover(Task):
     def download_snapshot(self, snapshot, url, i, total):
         self._task_log.info('fetching snapshot %d out of %d', i, total)
         # rdb.set_trace()
-        # self.update_state(task_id= self.request.id, state='PENDING',
+        # self.update_state(task_id= current_task.request.id, state='PENDING',
         # meta={'info': ' captures have been processed'})
         response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + '/' + url)
         self._task_log.info('calculating simhash for snapshot %d out of %d', i, total)
         return response
 
     def start_simhash_import(self, snapshot,
-                             url, i, total):
-        cProfile.runctx('self.get_calc_save(snapshot, url, i, total)',
+                             url, index, total):
+        cProfile.runctx('self.get_calc_save(snapshot, url, index, total)',
                         globals=globals(), locals=locals(), filename='profile.prof')
 
-    def get_calc_save(self, snapshot, url, i, total):
-        data = self.download_snapshot(snapshot, url, i, total)
+    def get_calc_save(self, snapshot, url, index, total):
+        data = self.download_snapshot(snapshot, url, index, total)
         data = self.calc_features(data)
         simhash = self.calculate_simhash(data)
-        self.save_to_redis(url, snapshot, simhash, total)
+        self.save_to_redis(url, snapshot, simhash, total, index)
 
     def calc_features(self, response):
         soup = BeautifulSoup(response.data.decode('utf-8', 'ignore'))
@@ -162,10 +163,9 @@ class Discover(Task):
                 with concurrent.futures.ThreadPoolExecutor(max_workers=
                                                            self.thread_number) as executor:
                     # Start the load operations and mark each future with its URL
-                    # TODO: Fix snapshot number
                     future_to_url = {executor.submit(self.start_simhash_import,
-                                                     snapshot, url, 1, total):
-                                         snapshot for snapshot in snapshots}
+                                                     snapshot, url, index, total):
+                                         snapshot for index, snapshot in enumerate(snapshots)}
                     for future in concurrent.futures.as_completed(future_to_url):
                         try:
                             future.result()
@@ -182,9 +182,8 @@ class Discover(Task):
             return json.dumps(result, sort_keys=True)
         return json.dumps(result, sort_keys=True)
 
-    def save_to_redis(self, url, snapshot, data, total):
-        # TODO: Fix snapshot number
-        self._task_log.info('saving to redis simhash for snapshot %d out of %d', 1, total)
+    def save_to_redis(self, url, snapshot, data, total, index):
+        self._task_log.info('saving to redis simhash for snapshot %d out of %d', index, total)
         self.redis_db.hset(url, snapshot[0], data)
 
 

@@ -28,17 +28,18 @@ class Discover(Task):
         redis_host = cfg['redis']['host']
         redis_port = cfg['redis']['port']
         redis_db = cfg['redis']['db']
-        self.logfile = cfg['logfile']
+        logfile = cfg['logfile']['name']
+        loglevel = cfg['logfile']['level']
         self.thread_number = cfg['threads']
         self.snapshots_number = cfg['snapshots']['number_per_year']
         self.redis_db = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 
         # Initialize logger
         self._log = logging.getLogger(__name__)
+        logging.getLogger(__name__).setLevel(loglevel)
         logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s',
-                            level=logging.INFO,
                             handlers=[
-                                logging.FileHandler(self.logfile),
+                                logging.FileHandler(logfile),
                                 logging.StreamHandler()
                             ])
 

@@ -11,9 +11,12 @@ test_redis:
     host: "localhost"
     db: 0
 
-logfile: log.txt
+logfile:
+    name: "log.txt"
+    level: "INFO"
 
 threads: 8
 
 snapshots:
     number_per_year: -1
+

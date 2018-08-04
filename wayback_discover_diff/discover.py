@@ -6,12 +6,10 @@ import cProfile
 from itertools import groupby
 from bs4 import BeautifulSoup
 import xxhash
-from celery.utils.log import get_task_logger
 from celery import Task
 import urllib3
 import redis
 from simhash import Simhash
-from celery.contrib import rdb
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
@@ -38,9 +36,11 @@ class Discover(Task):
         # Initialize logger
         self._log = logging.getLogger(__name__)
         logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s',
-                            filename=self.logfile, level=logging.INFO)
-        # Initialize Task logger
-        self._task_log = get_task_logger(__name__)
+                            level=logging.INFO,
+                            handlers=[
+                                logging.FileHandler(self.logfile),
+                                logging.StreamHandler()
+                            ])
 
     def timestamp_simhash(self, url, timestamp):
         if not url:
@@ -81,11 +81,11 @@ class Discover(Task):
         return json.dumps({'simhash': 'None'})
 
     def download_snapshot(self, snapshot, url, i, total, job_id):
-        self._task_log.info('fetching snapshot %d out of %d', i, total)
+        self._log.info('fetching snapshot %d out of %d', i, total)
         self.update_state(task_id= job_id, state='PENDING',
         meta={'info': str(i-1) + ' captures have been processed'})
         response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + '/' + url)
-        self._task_log.info('calculating simhash for snapshot %d out of %d', i, total)
+        self._log.info('calculating simhash for snapshot %d out of %d', i, total)
         return response
 
     def start_simhash_import(self, snapshot,
@@ -125,21 +125,21 @@ class Discover(Task):
 
     def calculate_simhash(self, text):
         temp_simhash = Simhash(text, self.simhash_size, hashfunc=hash_function).value
-        self._task_log.info(temp_simhash)
+        self._log.info(temp_simhash)
         return temp_simhash
 
     def run(self, url, year):
         time_started = datetime.datetime.now()
-        self._task_log.info('calculate simhash started')
+        self._log.info('calculate simhash started')
         if not url:
-            self._task_log.error('did not give url parameter')
+            self._log.error('did not give url parameter')
             result = {'status': 'error', 'info': 'URL is required.'}
         elif not year:
-            self._task_log.error('did not give year parameter')
+            self._log.error('did not give year parameter')
             result = {'status': 'error', 'info': 'Year is required.'}
         else:
             try:
-                self._task_log.info('fetching timestamps of %s for year %s', url, year)
+                self._log.info('fetching timestamps of %s for year %s', url, year)
                 self.update_state(state='PENDING',
                                   meta={'info': 'Fetching timestamps of '
                                                 + url + ' for year ' + year})
@@ -148,11 +148,11 @@ class Discover(Task):
                 if self.snapshots_number != -1:
                     wayback_url += '&limit=' + str(self.snapshots_number)
                 response = self.http.request('GET', wayback_url)
-                self._task_log.info('finished fetching timestamps of %s for year %s', url, year)
+                self._log.info('finished fetching timestamps of %s for year %s', url, year)
                 snapshots = json.loads(response.data.decode('utf-8'))
 
                 if not snapshots:
-                    self._task_log.error('no snapshots found for this year and url combination')
+                    self._log.error('no snapshots found for this year and url combination')
                     result = {'status': 'error',
                               'info': 'no snapshots found for this year and url combination'}
                     return json.dumps(result, sort_keys=True)
@@ -169,20 +169,20 @@ class Discover(Task):
                         try:
                             future.result()
                         except Exception as exc:
-                            self._task_log.error(exc)
+                            self._log.error(exc)
             except Exception as exc:
-                self._task_log.error(exc.args[0])
+                self._log.error(exc.args[0])
                 result = {'status': 'error', 'info': exc.args[0]}
                 return json.dumps(result, sort_keys=True)
             time_ended = datetime.datetime.now()
             result = {'duration': str((time_ended - time_started).seconds)}
-            self._task_log.info('calculate simhash ended with duration: %d',
+            self._log.info('calculate simhash ended with duration: %d',
                                 (time_ended - time_started).seconds)
             return json.dumps(result, sort_keys=True)
         return json.dumps(result, sort_keys=True)
 
     def save_to_redis(self, url, snapshot, data, total, index):
-        self._task_log.info('saving to redis simhash for snapshot %d out of %d', index, total)
+        self._log.info('saving to redis simhash for snapshot %d out of %d', index, total)
         self.redis_db.hset(url, snapshot[0], data)
 
 

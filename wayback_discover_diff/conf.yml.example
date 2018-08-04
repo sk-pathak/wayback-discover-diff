@@ -13,7 +13,7 @@ test_redis:
 
 logfile:
     name: "log.txt"
-    level: "INFO"
+    level: 20
 
 threads: 8
 

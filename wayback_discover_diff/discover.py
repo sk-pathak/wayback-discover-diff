@@ -80,22 +80,21 @@ class Discover(Task):
         self._log.info('No simhases for this URL and Year')
         return json.dumps({'simhash': 'None'})
 
-    def download_snapshot(self, snapshot, url, i, total):
+    def download_snapshot(self, snapshot, url, i, total, job_id):
         self._task_log.info('fetching snapshot %d out of %d', i, total)
-        # rdb.set_trace()
-        # self.update_state(task_id= current_task.request.id, state='PENDING',
-        # meta={'info': ' captures have been processed'})
+        self.update_state(task_id= job_id, state='PENDING',
+        meta={'info': str(i-1) + ' captures have been processed'})
         response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + '/' + url)
         self._task_log.info('calculating simhash for snapshot %d out of %d', i, total)
         return response
 
     def start_simhash_import(self, snapshot,
-                             url, index, total):
-        cProfile.runctx('self.get_calc_save(snapshot, url, index, total)',
+                             url, index, total, job_id):
+        cProfile.runctx('self.get_calc_save(snapshot, url, index, total, job_id)',
                         globals=globals(), locals=locals(), filename='profile.prof')
 
-    def get_calc_save(self, snapshot, url, index, total):
-        data = self.download_snapshot(snapshot, url, index, total)
+    def get_calc_save(self, snapshot, url, index, total, job_id):
+        data = self.download_snapshot(snapshot, url, index, total, job_id)
         data = self.calc_features(data)
         simhash = self.calculate_simhash(data)
         self.save_to_redis(url, snapshot, simhash, total, index)
@@ -130,7 +129,6 @@ class Discover(Task):
         return temp_simhash
 
     def run(self, url, year):
-        # rdb.set_trace()
         time_started = datetime.datetime.now()
         self._task_log.info('calculate simhash started')
         if not url:
@@ -160,11 +158,12 @@ class Discover(Task):
                     return json.dumps(result, sort_keys=True)
                 snapshots.pop(0)
                 total = len(snapshots)
+                job_id = self.request.id
                 with concurrent.futures.ThreadPoolExecutor(max_workers=
                                                            self.thread_number) as executor:
                     # Start the load operations and mark each future with its URL
                     future_to_url = {executor.submit(self.start_simhash_import,
-                                                     snapshot, url, index, total):
+                                                     snapshot, url, index, total, job_id):
                                          snapshot for index, snapshot in enumerate(snapshots)}
                     for future in concurrent.futures.as_completed(future_to_url):
                         try:

@@ -12,6 +12,11 @@ A Python 3.4 application running a web service that accepts HTTP GET requests an
   
   Returns JSON {“simhash”: “XXXX”} if capture simhash has already been calculated or None if it fails.
   
+- /simhash?url={URL}&year={YEAR}
+  
+  Which returns all the timestamps for which a simhash value exists in the DB for that specific URL and year with the following       format : [{"simhash": "SIMHASH_VALUE", "timestamp": "TIMESTAMP_VALUE"}]
+
+  
 - /job?job_id=<job_Id>
   
   Returns JSON {“status”: “pending”, “job_Id”: “XXYYZZ”, “info”: “X out of Y captures have been processed”} the status of the job matching that specific job id

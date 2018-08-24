@@ -83,8 +83,8 @@ class Discover(Task):
 
     def download_snapshot(self, snapshot, url, i, total, job_id):
         self._log.info('fetching snapshot %d out of %d', i, total)
-        self.update_state(task_id= job_id, state='PENDING',
-        meta={'info': str(i-1) + ' captures have been processed'})
+        self.update_state(task_id=job_id, state='PENDING',
+                          meta={'info': str(i - 1) + ' captures have been processed'})
         response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + '/' + url)
         self._log.info('calculating simhash for snapshot %d out of %d', i, total)
         return response
@@ -178,7 +178,7 @@ class Discover(Task):
             time_ended = datetime.datetime.now()
             result = {'duration': str((time_ended - time_started).seconds)}
             self._log.info('calculate simhash ended with duration: %d',
-                                (time_ended - time_started).seconds)
+                           (time_ended - time_started).seconds)
             return json.dumps(result, sort_keys=True)
         return json.dumps(result, sort_keys=True)
 

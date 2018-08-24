@@ -3,6 +3,7 @@ import os
 from celery import (Celery, states)
 from celery.result import AsyncResult
 from flask import (Flask, request, jsonify, json)
+from flask_cors import CORS
 import yaml
 
 from wayback_discover_diff.discover import Discover
@@ -38,6 +39,9 @@ except OSError:
 CELERY = Celery(APP.name, broker=APP.config['CELERY_BROKER_URL'])
 CELERY.conf.update(APP.config)
 CELERY.register_task(Discover(CFG))
+
+# Initialize CORS support
+CORS(APP)
 
 
 @APP.route('/simhash')

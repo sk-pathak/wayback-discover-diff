@@ -20,4 +20,6 @@ threads: 8
 snapshots:
     number_per_year: -1
 
-cors: true
+cors:
+    ['http://localhost:3000',
+    'http://localhost:3001']

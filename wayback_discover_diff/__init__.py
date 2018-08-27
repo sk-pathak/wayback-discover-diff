@@ -41,8 +41,10 @@ CELERY.conf.update(APP.config)
 CELERY.register_task(Discover(CFG))
 
 # Initialize CORS support
-if CFG['cors']:
-    CORS(APP)
+cors = CFG.get('cors')
+if cors:
+    CORS(APP, origins=cors)
+
 
 @APP.route('/simhash')
 def simhash():

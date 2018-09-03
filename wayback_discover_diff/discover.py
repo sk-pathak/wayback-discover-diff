@@ -77,7 +77,7 @@ class Discover(Task):
                     simhash = self.redis_db.hget(url, timestamp).decode('utf-8')
                     available_simhashes.append({str(timestamp): str(simhash)})
                 self._log.info('found entry %s', timestamp)
-            return json.dumps(available_simhashes)
+            return json.dumps(available_simhashes, separators=',:')
         self._log.info('No simhases for this URL and Year')
         return json.dumps({'simhash': 'None'})
 
@@ -151,7 +151,7 @@ class Discover(Task):
                 response = self.http.request('GET', wayback_url)
                 self._log.info('finished fetching timestamps of %s for year %s', url, year)
                 snapshots = json.loads(response.data.decode('utf-8'))
-                
+
                 if not snapshots:
                     self._log.error('no snapshots found for this year and url combination')
                     result = {'status': 'error',

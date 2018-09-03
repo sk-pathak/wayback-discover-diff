@@ -75,7 +75,7 @@ class Discover(Task):
                 timestamp_year = timestamp[:4]
                 if timestamp_year == str(year):
                     simhash = self.redis_db.hget(url, timestamp).decode('utf-8')
-                    available_simhashes.append({'timestamp': timestamp, 'simhash': simhash})
+                    available_simhashes.append({str(timestamp): str(simhash)})
                 self._log.info('found entry %s', timestamp)
             return json.dumps(available_simhashes)
         self._log.info('No simhases for this URL and Year')
@@ -89,8 +89,8 @@ class Discover(Task):
         self._log.info('calculating simhash for snapshot %d out of %d', i, total)
         return response
 
-    def start_simhash_import(self, snapshot,
-                             url, index, total, job_id):
+    def start_profiling(self, snapshot,
+                        url, index, total, job_id):
         cProfile.runctx('self.get_calc_save(snapshot, url, index, total, job_id)',
                         globals=globals(), locals=locals(), filename='profile.prof')
 
@@ -151,7 +151,7 @@ class Discover(Task):
                 response = self.http.request('GET', wayback_url)
                 self._log.info('finished fetching timestamps of %s for year %s', url, year)
                 snapshots = json.loads(response.data.decode('utf-8'))
-
+                
                 if not snapshots:
                     self._log.error('no snapshots found for this year and url combination')
                     result = {'status': 'error',
@@ -163,7 +163,9 @@ class Discover(Task):
                 with concurrent.futures.ThreadPoolExecutor(max_workers=
                                                            self.thread_number) as executor:
                     # Start the load operations and mark each future with its URL
-                    future_to_url = {executor.submit(self.start_simhash_import,
+                    # future_to_url = {executor.submit(self.start_profiling,
+                    #                                  snapshot, url, index, total, job_id):
+                    future_to_url = {executor.submit(self.get_calc_save,
                                                      snapshot, url, index, total, job_id):
                                          snapshot for index, snapshot in enumerate(snapshots)}
                     for future in concurrent.futures.as_completed(future_to_url):

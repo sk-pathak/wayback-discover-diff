@@ -77,10 +77,11 @@ class Discover(Task):
                 if timestamp_year == str(year):
                     timestamps_to_fetch.append(timestamp)
                     self._log.info('found entry %s', timestamp)
-            results = self.redis_db.hmget(url, timestamps_to_fetch)
-            for i, simhash in enumerate(results):
-                available_simhashes.append({str(timestamps_to_fetch[i]): simhash.decode('utf-8')})
-            return json.dumps(available_simhashes, separators=',:')
+            if timestamps_to_fetch:
+                results = self.redis_db.hmget(url, timestamps_to_fetch)
+                for i, simhash in enumerate(results):
+                    available_simhashes.append({str(timestamps_to_fetch[i]): simhash.decode('utf-8')})
+                return json.dumps(available_simhashes, separators=',:')
         self._log.info('No simhases for this URL and Year')
         return json.dumps({'simhash': 'None'})
 

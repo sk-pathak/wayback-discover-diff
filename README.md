@@ -14,7 +14,7 @@ A Python 3.4 application running a web service that accepts HTTP GET requests an
   
 - /simhash?url={URL}&year={YEAR}
   
-  Which returns all the timestamps for which a simhash value exists in the DB for that specific URL and year with the following       format : [{"simhash": "SIMHASH_VALUE", "timestamp": "TIMESTAMP_VALUE"}]
+  Which returns all the timestamps for which a simhash value exists in the DB for that specific URL and year with the following       format : [["SIMHASH_VALUE", TIMESTAMP_VALUE"]]
 
   
 - /job?job_id=<job_Id>

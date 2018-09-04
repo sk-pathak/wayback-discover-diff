@@ -3,6 +3,8 @@ import concurrent.futures
 import logging
 import datetime
 import cProfile
+import struct
+import base64
 from itertools import groupby
 from bs4 import BeautifulSoup
 import xxhash
@@ -190,7 +192,7 @@ class Discover(Task):
 
     def save_to_redis(self, url, snapshot, data, total, index):
         self._log.info('saving to redis simhash for snapshot %d out of %d', index, total)
-        self.redis_db.hset(url, snapshot[0], data)
+        self.redis_db.hset(url, snapshot[0], base64.b64encode(struct.pack('L', data)))
 
 
 def hash_function(x):

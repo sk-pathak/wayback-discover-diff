@@ -18,7 +18,8 @@ setup(
         'xxhash',
         'beautifulsoup4',
         'lxml',
-        'flask-cors'
+        'flask-cors',
+        'surt'
         ],
     tests_require=[
         'pytest',

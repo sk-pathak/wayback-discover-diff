@@ -12,6 +12,7 @@ from celery import Task
 import urllib3
 import redis
 from simhash import Simhash
+from surt import surt
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
@@ -53,7 +54,7 @@ class Discover(Task):
             self._log.error('did not give timestamp parameter')
             return json.dumps({'error': 'Timestamp is required.'})
         self._log.info('requesting redis db entry for %s %s', url, timestamp)
-        results = self.redis_db.hget(url, timestamp)
+        results = self.redis_db.hget(surt(url), timestamp)
         if results:
             results = results.decode('utf-8')
             self._log.info('found entry %s', results)
@@ -69,7 +70,7 @@ class Discover(Task):
             self._log.error('did not give year parameter')
             return json.dumps({'error': 'Year is required.'})
         self._log.info('requesting redis db entry for %s %s', url, year)
-        results = self.redis_db.hkeys(url)
+        results = self.redis_db.hkeys(surt(url))
         if results:
             available_simhashes = []
             timestamps_to_fetch = []
@@ -80,7 +81,7 @@ class Discover(Task):
                     timestamps_to_fetch.append(timestamp)
                     self._log.info('found entry %s', timestamp)
             if timestamps_to_fetch:
-                results = self.redis_db.hmget(url, timestamps_to_fetch)
+                results = self.redis_db.hmget(surt(url), timestamps_to_fetch)
                 for i, simhash in enumerate(results):
                     available_simhashes.append([str(timestamps_to_fetch[i]), simhash.decode('utf-8')])
                 return json.dumps(available_simhashes, separators=',:')
@@ -192,7 +193,7 @@ class Discover(Task):
 
     def save_to_redis(self, url, snapshot, data, total, index):
         self._log.info('saving to redis simhash for snapshot %d out of %d', index, total)
-        self.redis_db.hset(url, snapshot[0], base64.b64encode(struct.pack('L', data)))
+        self.redis_db.hset(surt(url), snapshot[0], base64.b64encode(struct.pack('L', data)))
 
 
 def hash_function(x):

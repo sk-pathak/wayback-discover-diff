@@ -92,7 +92,7 @@ class Discover(Task):
         self._log.info('fetching snapshot %d out of %d', i, total)
         self.update_state(task_id=job_id, state='PENDING',
                           meta={'info': str(i - 1) + ' captures have been processed'})
-        response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + '/' + url)
+        response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + 'id_/' + url)
         self._log.info('calculating simhash for snapshot %d out of %d', i, total)
         return response
 

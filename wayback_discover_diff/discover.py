@@ -36,7 +36,7 @@ class Discover(Task):
         self.thread_number = cfg['threads']
         self.snapshots_number = cfg['snapshots']['number_per_year']
         self.redis_db = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
-
+        self.digest_dict = {}
         # Initialize logger
         self._log = logging.getLogger(__name__)
         logging.getLogger(__name__).setLevel(loglevel)
@@ -103,10 +103,14 @@ class Discover(Task):
                         globals=globals(), locals=locals(), filename='profile.prof')
 
     def get_calc_save(self, snapshot, url, index, total, job_id):
-        data = self.download_snapshot(snapshot, url, index, total, job_id)
-        data = self.calc_features(data)
-        simhash = self.calculate_simhash(data)
-        self.save_to_redis(url, snapshot, simhash, total, index)
+        if snapshot[1] in self.digest_dict:
+            self.save_to_redis(url, snapshot, self.digest_dict[snapshot[1]], total, index)
+        else:
+            data = self.download_snapshot(snapshot, url, index, total, job_id)
+            data = self.calc_features(data)
+            simhash = self.calculate_simhash(data)
+            self.digest_dict[snapshot[1]] = simhash
+            self.save_to_redis(url, snapshot, simhash, total, index)
 
     def calc_features(self, response):
         soup = BeautifulSoup(response.data.decode('utf-8', 'ignore'))
@@ -153,7 +157,7 @@ class Discover(Task):
                                   meta={'info': 'Fetching timestamps of '
                                                 + url + ' for year ' + year})
                 wayback_url = 'http://web.archive.org/cdx/search/cdx?url=' + url + \
-                              '&' + 'from=' + year + '&to=' + year + '&fl=timestamp&output=json'
+                              '&' + 'from=' + year + '&to=' + year + '&fl=timestamp,digest&output=json'
                 if self.snapshots_number != -1:
                     wayback_url += '&limit=' + str(self.snapshots_number)
                 response = self.http.request('GET', wayback_url)

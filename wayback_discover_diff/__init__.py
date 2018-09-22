@@ -52,7 +52,13 @@ def simhash():
     timestamp = request.args.get('timestamp')
     if not timestamp:
         year = request.args.get('year')
-        return APP.discover.year_simhash(url, year)
+        if request.args.get('page'):
+            try:
+                page = int(request.args.get('page'))
+                return APP.discover.year_simhash(url, year, page)
+            except ValueError:
+                return jsonify({'status': 'error', 'info': 'Page param accepts only numbers.'})
+        return APP.discover.year_simhash(url, year, None)
     return APP.discover.timestamp_simhash(url, timestamp)
 
 

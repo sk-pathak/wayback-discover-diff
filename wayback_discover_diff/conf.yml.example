@@ -19,6 +19,7 @@ threads: 8
 
 snapshots:
     number_per_year: -1
+    number_per_page: 600
 
 cors:
     ['http://localhost:3000',

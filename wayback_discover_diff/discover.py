@@ -3,6 +3,7 @@ import concurrent.futures
 import logging
 import datetime
 import cProfile
+from math import ceil
 import struct
 import base64
 from itertools import groupby
@@ -35,6 +36,7 @@ class Discover(Task):
         loglevel = cfg['logfile']['level']
         self.thread_number = cfg['threads']
         self.snapshots_number = cfg['snapshots']['number_per_year']
+        self.snapshots_per_page = cfg['snapshots']['number_per_page']
         self.redis_db = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
         self.digest_dict = {}
         # Initialize logger
@@ -62,37 +64,53 @@ class Discover(Task):
         self._log.info('entry not found')
         return json.dumps({'simhash': 'None'})
 
-    def year_simhash(self, url, year):
+    def year_simhash(self, url, year, page):
         if not url:
             self._log.error('did not give url parameter')
             return json.dumps({'error': 'URL is required.'})
         if not year:
             self._log.error('did not give year parameter')
             return json.dumps({'error': 'Year is required.'})
+        if page is not None and page < 1:
+            self._log.info('Page param needs to be bigger than zero')
+            return json.dumps({'status': 'error', 'info': 'Page param needs to be bigger than zero.'})
         self._log.info('requesting redis db entry for %s %s', url, year)
         results = self.redis_db.hkeys(surt(url))
         if results:
-            available_simhashes = []
             timestamps_to_fetch = []
             for timestamp in results:
                 timestamp = timestamp.decode('UTF-8')
                 timestamp_year = timestamp[:4]
                 if timestamp_year == str(year):
                     timestamps_to_fetch.append(timestamp)
-                    self._log.info('found entry %s', timestamp)
             if timestamps_to_fetch:
-                results = self.redis_db.hmget(surt(url), timestamps_to_fetch)
-                for i, simhash in enumerate(results):
-                    available_simhashes.append([str(timestamps_to_fetch[i]), simhash.decode('utf-8')])
-                return json.dumps(available_simhashes, separators=',:')
+                return self.handle_results(timestamps_to_fetch, url, page)
         self._log.info('No simhases for this URL and Year')
         return json.dumps({'simhash': 'None'})
 
+    def handle_results(self, timestamps_to_fetch, url, page):
+        available_simhashes = []
+        if page is not None:
+            number_of_pages = ceil(len(timestamps_to_fetch) / self.snapshots_per_page)
+            if page > number_of_pages:
+                page = number_of_pages
+            if number_of_pages > 0:
+                timestamps_to_fetch = \
+                    timestamps_to_fetch[(page - 1) * self.snapshots_per_page:(page * self.snapshots_per_page)]
+            else:
+                number_of_pages = 1
+        results = self.redis_db.hmget(surt(url), timestamps_to_fetch)
+        for i, simhash in enumerate(results):
+            available_simhashes.append([str(timestamps_to_fetch[i]), simhash.decode('utf-8')])
+        if page is not None:
+            available_simhashes.insert(0,["pages",number_of_pages])
+        return json.dumps(available_simhashes, separators=',:')
+
     def download_snapshot(self, snapshot, url, i, total, job_id):
         self._log.info('fetching snapshot %d out of %d', i, total)
-        if (i-1) % 10 == 0:
+        if (i - 1) % 10 == 0:
             self.update_state(task_id=job_id, state='PENDING',
-                          meta={'info': str(i - 1) + ' captures have been processed'})
+                              meta={'info': str(i - 1) + ' captures have been processed'})
         response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + 'id_/' + url)
         self._log.info('calculating simhash for snapshot %d out of %d', i, total)
         return response

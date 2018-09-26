@@ -15,6 +15,10 @@ A Python 3.4 application running a web service that accepts HTTP GET requests an
 - /simhash?url={URL}&year={YEAR}
   
   Which returns all the timestamps for which a simhash value exists in the DB for that specific URL and year with the following       format : [["TIMESTAMP_VALUE", "SIMHASH_VALUE"]]
+
+- /simhash?url={URL}&year={YEAR}&page={PAGE_NUMBER}
+  
+  Which is the same as the request above but, depending on the page size that is set in the conf.yml file, the results are paginated. The response has the following format : [["pages","NUMBER_OF_PAGES"],["TIMESTAMP_VALUE", "SIMHASH_VALUE"]]
   
   **The SIMHASH_VALUE is base64 encoded**
   

@@ -39,7 +39,6 @@ class Discover(Task):
         self.snapshots_number = cfg['snapshots']['number_per_year']
         self.snapshots_per_page = cfg['snapshots']['number_per_page']
         self.redis_db = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
-        self.digest_dict = {}
         # Initialize logger
         self._log = logging.getLogger(__name__)
         logging.getLogger(__name__).setLevel(loglevel)
@@ -104,32 +103,31 @@ class Discover(Task):
         for i, simhash in enumerate(results):
             available_simhashes.append([str(timestamps_to_fetch[i]), simhash.decode('utf-8')])
         if page is not None:
-            available_simhashes.insert(0,["pages",number_of_pages])
+            available_simhashes.insert(0,["pages", number_of_pages])
         return json.dumps(available_simhashes, separators=',:')
 
-    def download_snapshot(self, snapshot, url, i, total, job_id):
-        self._log.info('fetching snapshot %d out of %d', i, total)
+    def download_snapshot(self, snapshot, i):
+        self._log.info('fetching snapshot %d out of %d', i, self.total)
         if (i - 1) % 10 == 0:
-            self.update_state(task_id=job_id, state='PENDING',
+            self.update_state(task_id=self.job_id, state='PENDING',
                               meta={'info': str(i - 1) + ' captures have been processed'})
-        response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + 'id_/' + url)
-        self._log.info('calculating simhash for snapshot %d out of %d', i, total)
+        response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + 'id_/' + self.url)
+        self._log.info('calculating simhash for snapshot %d out of %d', i, self.total)
         return response.data.decode('utf-8', 'ignore')
 
-    def start_profiling(self, snapshot,
-                        url, index, total, job_id):
-        cProfile.runctx('self.get_calc_save(snapshot, url, index, total, job_id)',
+    def start_profiling(self, snapshot, index):
+        cProfile.runctx('self.get_calc_save(snapshot, index)',
                         globals=globals(), locals=locals(), filename='profile.prof')
 
-    def get_calc_save(self, snapshot, url, index, total, job_id):
+    def get_calc_save(self, snapshot, index):
         if snapshot[1] in self.digest_dict:
-            self.save_to_redis(url, snapshot, self.digest_dict[snapshot[1]], total, index)
+            self.save_to_redis(snapshot, self.digest_dict[snapshot[1]], index)
         else:
-            response_data = self.download_snapshot(snapshot, url, index, total, job_id)
+            response_data = self.download_snapshot(snapshot, index)
             data = self.calc_features(response_data)
             simhash = self.calculate_simhash(data)
             self.digest_dict[snapshot[1]] = simhash
-            self.save_to_redis(url, snapshot, simhash, total, index)
+            self.save_to_redis(snapshot, simhash, index)
 
     def calc_features(self, response):
         soup = BeautifulSoup(response)
@@ -161,26 +159,28 @@ class Discover(Task):
         return temp_simhash
 
     def run(self, url, year):
+        self.url = url
         time_started = datetime.datetime.now()
         self._log.info('calculate simhash started')
-        if not url:
+        if not self.url:
             self._log.error('did not give url parameter')
             result = {'status': 'error', 'info': 'URL is required.'}
         elif not year:
             self._log.error('did not give year parameter')
             result = {'status': 'error', 'info': 'Year is required.'}
         else:
+            self.digest_dict = {}
             try:
-                self._log.info('fetching timestamps of %s for year %s', url, year)
+                self._log.info('fetching timestamps of %s for year %s', self.url, year)
                 self.update_state(state='PENDING',
                                   meta={'info': 'Fetching timestamps of '
-                                                + url + ' for year ' + year})
-                wayback_url = 'http://web.archive.org/cdx/search/cdx?url=' + url + \
+                                                + self.url + ' for year ' + year})
+                wayback_url = 'http://web.archive.org/cdx/search/cdx?url=' + self.url + \
                               '&' + 'from=' + year + '&to=' + year + '&fl=timestamp,digest&output=json'
                 if self.snapshots_number != -1:
                     wayback_url += '&limit=' + str(self.snapshots_number)
                 response = self.http.request('GET', wayback_url)
-                self._log.info('finished fetching timestamps of %s for year %s', url, year)
+                self._log.info('finished fetching timestamps of %s for year %s', self.url, year)
                 snapshots = json.loads(response.data.decode('utf-8'))
 
                 if not snapshots:
@@ -189,22 +189,22 @@ class Discover(Task):
                               'info': 'no snapshots found for this year and url combination'}
                     return json.dumps(result, sort_keys=True)
                 snapshots.pop(0)
-                total = len(snapshots)
-                job_id = self.request.id
+                self.total = len(snapshots)
+                self.job_id = self.request.id
                 with concurrent.futures.ThreadPoolExecutor(max_workers=
                                                            self.thread_number) as executor:
                     # Start the load operations and mark each future with its URL
                     # future_to_url = {executor.submit(self.start_profiling,
-                    #                                  snapshot, url, index, total, job_id):
+                    #                                  snapshot, index):
                     future_to_url = {executor.submit(self.get_calc_save,
-                                                     snapshot, url, index, total, job_id):
+                                                     snapshot, index):
                                          snapshot for index, snapshot in enumerate(snapshots)}
                     for future in concurrent.futures.as_completed(future_to_url):
                         try:
                             future.result()
                         except Exception as exc:
                             self._log.error(exc)
-                    self.redis_db.expire(surt(url), self.simhash_expire)
+                    self.redis_db.expire(surt(self.url), self.simhash_expire)
             except Exception as exc:
                 self._log.error(exc.args[0])
                 result = {'status': 'error', 'info': exc.args[0]}
@@ -216,9 +216,9 @@ class Discover(Task):
             return json.dumps(result, sort_keys=True)
         return json.dumps(result, sort_keys=True)
 
-    def save_to_redis(self, url, snapshot, data, total, index):
-        self._log.info('saving to redis simhash for snapshot %d out of %d', index, total)
-        self.redis_db.hset(surt(url), snapshot[0], base64.b64encode(struct.pack('L', data)))
+    def save_to_redis(self, snapshot, data, index):
+        self._log.info('saving to redis simhash for snapshot %d out of %d', index, self.total)
+        self.redis_db.hset(surt(self.url), snapshot[0], base64.b64encode(struct.pack('L', data)))
 
 
 def hash_function(x):

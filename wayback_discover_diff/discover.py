@@ -114,7 +114,7 @@ class Discover(Task):
                               meta={'info': str(i - 1) + ' captures have been processed'})
         response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + 'id_/' + url)
         self._log.info('calculating simhash for snapshot %d out of %d', i, total)
-        return response
+        return response.data.decode('utf-8', 'ignore')
 
     def start_profiling(self, snapshot,
                         url, index, total, job_id):
@@ -125,14 +125,14 @@ class Discover(Task):
         if snapshot[1] in self.digest_dict:
             self.save_to_redis(url, snapshot, self.digest_dict[snapshot[1]], total, index)
         else:
-            data = self.download_snapshot(snapshot, url, index, total, job_id)
-            data = self.calc_features(data)
+            response_data = self.download_snapshot(snapshot, url, index, total, job_id)
+            data = self.calc_features(response_data)
             simhash = self.calculate_simhash(data)
             self.digest_dict[snapshot[1]] = simhash
             self.save_to_redis(url, snapshot, simhash, total, index)
 
     def calc_features(self, response):
-        soup = BeautifulSoup(response.data.decode('utf-8', 'ignore'))
+        soup = BeautifulSoup(response)
 
         # kill all script and style elements
         for script in soup(["script", "style"]):

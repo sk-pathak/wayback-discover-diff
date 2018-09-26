@@ -28,6 +28,7 @@ class Discover(Task):
 
     def __init__(self, cfg):
         self.simhash_size = cfg['simhash']['size']
+        self.simhash_expire = cfg['simhash']['expire_after']
         self.http = urllib3.PoolManager(retries=urllib3.Retry(3, redirect=1))
         redis_host = cfg['redis']['host']
         redis_port = cfg['redis']['port']
@@ -203,6 +204,7 @@ class Discover(Task):
                             future.result()
                         except Exception as exc:
                             self._log.error(exc)
+                    self.redis_db.expire(surt(url), self.simhash_expire)
             except Exception as exc:
                 self._log.error(exc.args[0])
                 result = {'status': 'error', 'info': exc.args[0]}

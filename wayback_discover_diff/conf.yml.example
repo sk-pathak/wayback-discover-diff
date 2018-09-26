@@ -1,5 +1,6 @@
 simhash:
     size: 128
+    expire_after: 86400
 
 redis:
     port: 6379

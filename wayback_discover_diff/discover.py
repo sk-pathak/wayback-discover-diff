@@ -111,7 +111,7 @@ class Discover(Task):
         if (i - 1) % 10 == 0:
             self.update_state(task_id=self.job_id, state='PENDING',
                               meta={'info': str(i - 1) + ' captures have been processed'})
-        response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot[0] + 'id_/' + self.url)
+        response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot + 'id_/' + self.url)
         self._log.info('calculating simhash for snapshot %d out of %d', i, self.total)
         return response.data.decode('utf-8', 'ignore')
 
@@ -120,14 +120,11 @@ class Discover(Task):
                         globals=globals(), locals=locals(), filename='profile.prof')
 
     def get_calc_save(self, snapshot, index):
-        if snapshot[1] in self.digest_dict:
-            self.save_to_redis(snapshot, self.digest_dict[snapshot[1]], index)
-        else:
-            response_data = self.download_snapshot(snapshot, index)
-            data = self.calc_features(response_data)
-            simhash = self.calculate_simhash(data)
-            self.digest_dict[snapshot[1]] = simhash
-            self.save_to_redis(snapshot, simhash, index)
+        response_data = self.download_snapshot(snapshot, index)
+        data = self.calc_features(response_data)
+        simhash = self.calculate_simhash(data)
+        self.digest_dict[self.non_dup[snapshot]] = simhash
+        self.save_to_redis(snapshot, simhash, index)
 
     def calc_features(self, response):
         soup = BeautifulSoup(response)
@@ -191,6 +188,14 @@ class Discover(Task):
                 snapshots.pop(0)
                 self.total = len(snapshots)
                 self.job_id = self.request.id
+
+                self.non_dup = {}
+                self.dup = {}
+                for elem in snapshots:
+                    if elem[1] in self.non_dup.values():
+                        self.dup[elem[0]] = elem[1]
+                    else:
+                        self.non_dup[elem[0]] = elem[1]
                 with concurrent.futures.ThreadPoolExecutor(max_workers=
                                                            self.thread_number) as executor:
                     # Start the load operations and mark each future with its URL
@@ -198,12 +203,14 @@ class Discover(Task):
                     #                                  snapshot, index):
                     future_to_url = {executor.submit(self.get_calc_save,
                                                      snapshot, index):
-                                         snapshot for index, snapshot in enumerate(snapshots)}
+                                         snapshot for index, snapshot in enumerate(self.non_dup)}
                     for future in concurrent.futures.as_completed(future_to_url):
                         try:
                             future.result()
                         except Exception as exc:
                             self._log.error(exc)
+                    for elem in self.dup:
+                        self.save_to_redis(elem, self.digest_dict[self.dup[elem]], -1)
                     self.redis_db.expire(surt(self.url), self.simhash_expire)
             except Exception as exc:
                 self._log.error(exc.args[0])
@@ -218,7 +225,7 @@ class Discover(Task):
 
     def save_to_redis(self, snapshot, data, index):
         self._log.info('saving to redis simhash for snapshot %d out of %d', index, self.total)
-        self.redis_db.hset(surt(self.url), snapshot[0], base64.b64encode(struct.pack('L', data)))
+        self.redis_db.hset(surt(self.url), snapshot, base64.b64encode(struct.pack('L', data)))
 
 
 def hash_function(x):

@@ -16,10 +16,10 @@ setup(
         'gunicorn',
         'pytest',
         'xxhash',
-        'beautifulsoup4',
         'lxml',
+        'html5lib',
         'flask-cors',
-        'surt'
+        'surt',
         ],
     tests_require=[
         'pytest',

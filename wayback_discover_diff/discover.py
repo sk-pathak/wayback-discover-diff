@@ -7,13 +7,15 @@ from math import ceil
 import struct
 import base64
 from itertools import groupby
-from bs4 import BeautifulSoup
 import xxhash
 from celery import Task
 import urllib3
 import redis
 from simhash import Simhash
 from surt import surt
+from lxml.html import fromstring, tostring
+from lxml.html import html5parser
+from lxml.html.clean import clean_html
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
@@ -127,14 +129,15 @@ class Discover(Task):
         self.save_to_redis(snapshot, simhash, index)
 
     def calc_features(self, response):
-        soup = BeautifulSoup(response)
 
-        # kill all script and style elements
-        for script in soup(["script", "style"]):
-            script.extract()  # rip it out
-
-        # get text
-        text = soup.get_text()
+        # use html5parser to heal html
+        e = html5parser.fromstring(response)
+        # get etree element
+        tree = fromstring(tostring(e))
+        # get rid of embedded content (scripts, css)
+        tree = clean_html(tree)
+        # get rid of markup
+        text = tree.text_content()
         # turn all characters to lowercase
         text = text.lower()
         # break into lines and remove leading and trailing space on each
@@ -147,7 +150,6 @@ class Discover(Task):
         text = text.split()
 
         text = {k: sum(1 for _ in g) for k, g in groupby(sorted(text))}
-
         return text
 
     def calculate_simhash(self, text):

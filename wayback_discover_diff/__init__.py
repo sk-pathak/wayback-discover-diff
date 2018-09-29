@@ -39,6 +39,7 @@ except OSError:
 CELERY = Celery(APP.name, broker=APP.config['CELERY_BROKER_URL'])
 CELERY.conf.update(APP.config)
 CELERY.register_task(Discover(CFG))
+CELERY.conf.task_default_queue = CFG['celery_queue_name']
 
 # Initialize CORS support
 cors = CFG.get('cors')

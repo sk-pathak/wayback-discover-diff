@@ -212,11 +212,15 @@ class Discover(Task):
                         except Exception as exc:
                             self._log.error(exc)
                     for elem in self.dup:
-                        self.save_to_redis(elem, self.digest_dict[self.dup[elem]], -1)
+                        try:
+                            self.save_to_redis(elem, self.digest_dict[self.dup[elem]], -1)
+                        except KeyError:
+                            self._log.info('Failed to fetch snapshot with digest: %s',
+                                           self.dup[elem])
                     self.redis_db.expire(surt(self.url), self.simhash_expire)
             except Exception as exc:
-                self._log.error(exc.args[0])
-                result = {'status': 'error', 'info': exc.args[0]}
+                self._log.error(exc)
+                result = {'status': 'error', 'info': exc}
                 return json.dumps(result, sort_keys=True)
             time_ended = datetime.datetime.now()
             result = {'duration': str((time_ended - time_started).seconds)}

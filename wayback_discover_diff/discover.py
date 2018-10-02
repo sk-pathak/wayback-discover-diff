@@ -109,10 +109,10 @@ class Discover(Task):
         return json.dumps(available_simhashes, separators=',:')
 
     def download_snapshot(self, snapshot, i):
-        self._log.info('fetching snapshot %d out of %d', i, self.total)
-        if (i - 1) % 10 == 0:
+        self._log.info('fetching snapshot %d out of %d', i+1, self.total)
+        if i % 10 == 0:
             self.update_state(task_id=self.job_id, state='PENDING',
-                              meta={'info': str(i - 1) + ' captures have been processed'})
+                              meta={'info': str(i) + ' captures have been processed'})
         response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot + 'id_/' + self.url)
         self._log.info('calculating simhash for snapshot %d out of %d', i, self.total)
         return response.data.decode('utf-8', 'ignore')
@@ -213,10 +213,9 @@ class Discover(Task):
                             self._log.error(exc)
                     for elem in self.dup:
                         try:
-                            self.save_to_redis(elem, self.digest_dict[self.dup[elem]], -1)
+                            self.save_to_redis(elem, self.digest_dict[self.dup[elem]], elem)
                         except KeyError:
-                            self._log.info('Failed to fetch snapshot with digest: %s',
-                                           self.dup[elem])
+                            self._log.info('Failed to fetch snapshot: %s', elem)
                     self.redis_db.expire(surt(self.url), self.simhash_expire)
             except Exception as exc:
                 self._log.error(exc)
@@ -229,8 +228,11 @@ class Discover(Task):
             return json.dumps(result, sort_keys=True)
         return json.dumps(result, sort_keys=True)
 
-    def save_to_redis(self, snapshot, data, index):
-        self._log.info('saving to redis simhash for snapshot %d out of %d', index, self.total)
+    def save_to_redis(self, snapshot, data, identifier):
+        if isinstance(identifier, int):
+            self._log.info('saving to redis simhash for snapshot %d out of %d', identifier, self.total)
+        else:
+            self._log.info('saving to redis simhash for snapshot %s', identifier)
         self.redis_db.hset(surt(self.url), snapshot, base64.b64encode(struct.pack('L', data)))
 
 

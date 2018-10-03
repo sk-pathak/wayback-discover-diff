@@ -10,6 +10,8 @@ test_redis:
     db: 0
 
 celery_queue_name: "wayback-discover-diff"
+celery_backend: "redis://localhost:6379/2"
+celery_broker: "redis://localhost:6379/3"
 
 logfile:
     name: "log.txt"

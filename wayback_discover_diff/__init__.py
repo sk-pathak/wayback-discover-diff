@@ -17,13 +17,6 @@ APP.config.update(CELERYD_HIJACK_ROOT_LOGGER=False)
 with open(os.environ['WAYBACK_DISCOVER_DIFF_CONF'], 'r') as ymlfile:
     CFG = yaml.load(ymlfile)
 
-APP.config.update(
-    CELERY_BROKER_URL=CFG['redis_uri'],
-    CELERY_RESULT_BACKEND=CFG['redis_uri']
-)
-
-APP.config.from_pyfile('config.py', silent=True)
-
 # NOTE it is a known issue that with the following we instantiate 2 Discovery
 # objects and create 2 Redis connections. There is certainly a way to have
 # only one. I couldn't find a way to run `app.discovery.simhash` in another way.
@@ -36,8 +29,7 @@ except OSError:
     pass
 
 # Initialize Celery and register Discover task.
-CELERY = Celery(APP.name, broker=APP.config['CELERY_BROKER_URL'])
-CELERY.conf.update(APP.config)
+CELERY = Celery(APP.name, broker=CFG['celery_broker'], backend=CFG['celery_backend'])
 CELERY.register_task(Discover(CFG))
 CELERY.conf.task_default_queue = CFG['celery_queue_name']
 

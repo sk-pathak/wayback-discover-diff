@@ -17,9 +17,9 @@ setup(
         'pytest',
         'xxhash',
         'lxml',
-        'html5lib',
+        'beautifulsoup4',
         'flask-cors',
-        'surt',
+        'surt'
         ],
     tests_require=[
         'pytest',

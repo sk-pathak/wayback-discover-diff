@@ -16,8 +16,8 @@ setup(
         'gunicorn',
         'pytest',
         'xxhash',
-        'beautifulsoup4',
         'lxml',
+        'beautifulsoup4',
         'flask-cors',
         'surt'
         ],

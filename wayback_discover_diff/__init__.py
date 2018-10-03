@@ -18,8 +18,8 @@ with open(os.environ['WAYBACK_DISCOVER_DIFF_CONF'], 'r') as ymlfile:
     CFG = yaml.load(ymlfile)
 
 APP.config.update(
-    CELERY_BROKER_URL='redis://' + str(CFG['redis']['host']) + ':' + str(CFG['redis']['port']),
-    CELERY_RESULT_BACKEND='redis://' + str(CFG['redis']['host']) + ':' + str(CFG['redis']['port'])
+    CELERY_BROKER_URL=CFG['redis_uri'],
+    CELERY_RESULT_BACKEND=CFG['redis_uri']
 )
 
 APP.config.from_pyfile('config.py', silent=True)
@@ -39,6 +39,7 @@ except OSError:
 CELERY = Celery(APP.name, broker=APP.config['CELERY_BROKER_URL'])
 CELERY.conf.update(APP.config)
 CELERY.register_task(Discover(CFG))
+CELERY.conf.task_default_queue = CFG['celery_queue_name']
 
 # Initialize CORS support
 cors = CFG.get('cors')

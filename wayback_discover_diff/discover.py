@@ -7,13 +7,13 @@ from math import ceil
 import struct
 import base64
 from itertools import groupby
-from bs4 import BeautifulSoup
 import xxhash
 from celery import Task
 import urllib3
 import redis
 from simhash import Simhash
 from surt import surt
+from bs4 import BeautifulSoup
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
@@ -30,9 +30,11 @@ class Discover(Task):
         self.simhash_size = cfg['simhash']['size']
         self.simhash_expire = cfg['simhash']['expire_after']
         self.http = urllib3.PoolManager(retries=urllib3.Retry(3, redirect=1))
-        redis_host = cfg['redis']['host']
-        redis_port = cfg['redis']['port']
-        redis_db = cfg['redis']['db']
+        redis_uri = cfg['redis_uri']
+        redis_host_port = redis_uri.split('/')[2]
+        redis_host = redis_host_port.split(':')[0]
+        redis_port = redis_host_port.split(':')[1]
+        redis_db = redis_uri.split('/')[3]
         logfile = cfg['logfile']['name']
         loglevel = cfg['logfile']['level']
         self.thread_number = cfg['threads']
@@ -127,6 +129,7 @@ class Discover(Task):
         self.save_to_redis(snapshot, simhash, index)
 
     def calc_features(self, response):
+
         soup = BeautifulSoup(response)
 
         # kill all script and style elements
@@ -147,7 +150,6 @@ class Discover(Task):
         text = text.split()
 
         text = {k: sum(1 for _ in g) for k, g in groupby(sorted(text))}
-
         return text
 
     def calculate_simhash(self, text):

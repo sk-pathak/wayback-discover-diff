@@ -18,8 +18,8 @@ with open(os.environ['WAYBACK_DISCOVER_DIFF_CONF'], 'r') as ymlfile:
     CFG = yaml.load(ymlfile)
 
 APP.config.update(
-    CELERY_BROKER_URL='redis://' + str(CFG['redis']['host']) + ':' + str(CFG['redis']['port']),
-    CELERY_RESULT_BACKEND='redis://' + str(CFG['redis']['host']) + ':' + str(CFG['redis']['port'])
+    CELERY_BROKER_URL=CFG['redis_uri'],
+    CELERY_RESULT_BACKEND=CFG['redis_uri']
 )
 
 APP.config.from_pyfile('config.py', silent=True)

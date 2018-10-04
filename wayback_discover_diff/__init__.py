@@ -1,5 +1,5 @@
 import os
-
+import pkg_resources
 from celery import (Celery, states)
 from celery.result import AsyncResult
 from flask import (Flask, request, jsonify, json)
@@ -37,6 +37,14 @@ CELERY.conf.task_default_queue = CFG['celery_queue_name']
 cors = CFG.get('cors')
 if cors:
     CORS(APP, origins=cors)
+
+
+@APP.route('/')
+def root():
+    """Return info on the current package version.
+    """
+    version = pkg_resources.require("wayback-discover-diff")[0].version
+    return "wayback-discover-diff service version: %s" % version
 
 
 @APP.route('/simhash')

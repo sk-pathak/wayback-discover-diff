@@ -12,8 +12,6 @@ test_redis:
     host: "localhost"
     db: 0
 
-celery_queue_name: "wayback-discover-diff"
-
 logfile:
     name: "log.txt"
     level: 20

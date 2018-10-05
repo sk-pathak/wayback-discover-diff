@@ -1,5 +1,5 @@
 import os
-
+import pkg_resources
 from celery import (Celery, states)
 from celery.result import AsyncResult
 from flask import (Flask, request, jsonify, json)
@@ -17,13 +17,6 @@ APP.config.update(CELERYD_HIJACK_ROOT_LOGGER=False)
 with open(os.environ['WAYBACK_DISCOVER_DIFF_CONF'], 'r') as ymlfile:
     CFG = yaml.load(ymlfile)
 
-APP.config.update(
-    CELERY_BROKER_URL='redis://' + str(CFG['redis']['host']) + ':' + str(CFG['redis']['port']),
-    CELERY_RESULT_BACKEND='redis://' + str(CFG['redis']['host']) + ':' + str(CFG['redis']['port'])
-)
-
-APP.config.from_pyfile('config.py', silent=True)
-
 # NOTE it is a known issue that with the following we instantiate 2 Discovery
 # objects and create 2 Redis connections. There is certainly a way to have
 # only one. I couldn't find a way to run `app.discovery.simhash` in another way.
@@ -36,14 +29,21 @@ except OSError:
     pass
 
 # Initialize Celery and register Discover task.
-CELERY = Celery(APP.name, broker=APP.config['CELERY_BROKER_URL'])
-CELERY.conf.update(APP.config)
+CELERY = Celery(APP.name, broker=CFG['celery_broker'], backend=CFG['celery_backend'])
 CELERY.register_task(Discover(CFG))
 
 # Initialize CORS support
 cors = CFG.get('cors')
 if cors:
     CORS(APP, origins=cors)
+
+
+@APP.route('/')
+def root():
+    """Return info on the current package version.
+    """
+    version = pkg_resources.require("wayback-discover-diff")[0].version
+    return "wayback-discover-diff service version: %s" % version
 
 
 @APP.route('/simhash')

@@ -30,15 +30,12 @@ class Discover(Task):
         self.simhash_size = cfg['simhash']['size']
         self.simhash_expire = cfg['simhash']['expire_after']
         self.http = urllib3.PoolManager(retries=urllib3.Retry(3, redirect=1))
-        redis_host = cfg['redis']['host']
-        redis_port = cfg['redis']['port']
-        redis_db = cfg['redis']['db']
+        self.redis_db = redis.StrictRedis.from_url(cfg['redis_uri'])
         logfile = cfg['logfile']['name']
         loglevel = cfg['logfile']['level']
         self.thread_number = cfg['threads']
         self.snapshots_number = cfg['snapshots']['number_per_year']
         self.snapshots_per_page = cfg['snapshots']['number_per_page']
-        self.redis_db = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
         # Initialize logger
         self._log = logging.getLogger(__name__)
         logging.getLogger(__name__).setLevel(loglevel)

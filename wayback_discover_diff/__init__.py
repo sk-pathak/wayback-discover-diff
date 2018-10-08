@@ -31,7 +31,6 @@ except OSError:
 # Initialize Celery and register Discover task.
 CELERY = Celery(APP.name, broker=CFG['celery_broker'], backend=CFG['celery_backend'])
 CELERY.register_task(Discover(CFG))
-CELERY.conf.task_default_queue = CFG['celery_queue_name']
 
 # Initialize CORS support
 cors = CFG.get('cors')

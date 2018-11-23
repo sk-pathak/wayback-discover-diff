@@ -19,6 +19,39 @@ from bs4 import BeautifulSoup
 urllib3.disable_warnings()
 
 
+def extract_html_features(html):
+    """Process HTML document and get key features as text. Steps:
+    kill all script and style elements
+    get lowercase text
+    break into lines and remove leading and trailing space on each
+    break multi-headlines into a line each
+    drop blank lines
+    return a dict with features and their weights
+    """
+    soup = BeautifulSoup(html, features='lxml')
+    for script in soup(["script", "style"]):
+        script.extract()
+    text = soup.get_text().lower()
+    lines = (line.strip() for line in text.splitlines())
+    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+    text = '\n'.join(chunk for chunk in chunks if chunk)
+    text = text.split()
+    return {k: sum(1 for _ in g) for k, g in groupby(sorted(text))}
+
+
+def hash_function(x):
+    """Custom FAST hash function used to generate simhash.
+    """
+    return int(xxhash.xxh64(x).hexdigest(), 16)
+
+
+def calculate_simhash(features_dict, simhash_size):
+    """Calculate simhash for features in a dict. `features_dict` contains data
+    like {'text': weight}
+    """
+    return Simhash(features_dict, simhash_size, hashfunc=hash_function).value
+
+
 class Discover(Task):
     """Custom Celery Task class.
     http://docs.celeryproject.org/en/latest/userguide/tasks.html#custom-task-classes
@@ -118,39 +151,9 @@ class Discover(Task):
 
     def get_calc_save(self, snapshot, index):
         response_data = self.download_snapshot(snapshot, index)
-        data = self.calc_features(response_data)
-        simhash = self.calculate_simhash(data)
-        self.digest_dict[self.non_dup[snapshot]] = simhash
+        data = extract_html_features(response_data)
+        self.digest_dict[self.non_dup[snapshot]] = calculate_simhash(data, self.simhash_size)
         self.save_to_redis(snapshot, simhash, index)
-
-    def calc_features(self, response):
-
-        soup = BeautifulSoup(response)
-
-        # kill all script and style elements
-        for script in soup(["script", "style"]):
-            script.extract()  # rip it out
-
-        # get text
-        text = soup.get_text()
-        # turn all characters to lowercase
-        text = text.lower()
-        # break into lines and remove leading and trailing space on each
-        lines = (line.strip() for line in text.splitlines())
-        # break multi-headlines into a line each
-        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        # drop blank lines
-        text = '\n'.join(chunk for chunk in chunks if chunk)
-
-        text = text.split()
-
-        text = {k: sum(1 for _ in g) for k, g in groupby(sorted(text))}
-        return text
-
-    def calculate_simhash(self, text):
-        temp_simhash = Simhash(text, self.simhash_size, hashfunc=hash_function).value
-        self._log.info(temp_simhash)
-        return temp_simhash
 
     def run(self, url, year):
         self.url = url
@@ -231,5 +234,3 @@ class Discover(Task):
         self.redis_db.hset(surt(self.url), snapshot, base64.b64encode(struct.pack('L', data)))
 
 
-def hash_function(x):
-    return int(xxhash.xxh64(x).hexdigest(), 16)

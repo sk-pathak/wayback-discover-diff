@@ -1,7 +1,7 @@
 import json
 import concurrent.futures
 import logging
-import datetime
+from datetime import datetime
 import cProfile
 import struct
 import base64
@@ -90,74 +90,70 @@ class Discover(Task):
 
     def run(self, url, year):
         self.url = url
-        time_started = datetime.datetime.now()
+        time_started = datetime.now()
         self._log.info('calculate simhash started')
         if not self.url:
             self._log.error('did not give url parameter')
-            result = {'status': 'error', 'info': 'URL is required.'}
-        elif not year:
+            return {'status': 'error', 'info': 'URL is required.'}
+        if not year:
             self._log.error('did not give year parameter')
-            result = {'status': 'error', 'info': 'Year is required.'}
-        else:
-            self.digest_dict = {}
-            try:
-                self._log.info('fetching timestamps of %s for year %s', self.url, year)
-                self.update_state(state='PENDING',
-                                  meta={'info': 'Fetching timestamps of '
-                                                + self.url + ' for year ' + year})
-                wayback_url = 'http://web.archive.org/cdx/search/cdx?url=' + self.url + \
-                              '&' + 'from=' + year + '&to=' + year + '&fl=timestamp,digest&output=json'
-                if self.snapshots_number != -1:
-                    wayback_url += '&limit=' + str(self.snapshots_number)
-                response = self.http.request('GET', wayback_url)
-                self._log.info('finished fetching timestamps of %s for year %s', self.url, year)
-                snapshots = json.loads(response.data.decode('utf-8'))
+            return {'status': 'error', 'info': 'Year is required.'}
 
-                if not snapshots:
-                    self._log.error('no snapshots found for this year and url combination')
-                    result = {'status': 'error',
-                              'info': 'no snapshots found for this year and url combination'}
-                    return json.dumps(result, sort_keys=True)
-                snapshots.pop(0)
-                self.total = len(snapshots)
-                self.job_id = self.request.id
+        self.digest_dict = {}
+        try:
+            self._log.info('fetching timestamps of %s for year %s', self.url, year)
+            self.update_state(state='PENDING',
+                                meta={'info': 'Fetching timestamps of '
+                                            + self.url + ' for year ' + year})
+            wayback_url = 'http://web.archive.org/cdx/search/cdx?url=' + self.url + \
+                            '&' + 'from=' + year + '&to=' + year + '&fl=timestamp,digest&output=json'
+            if self.snapshots_number != -1:
+                wayback_url += '&limit=' + str(self.snapshots_number)
+            response = self.http.request('GET', wayback_url)
+            self._log.info('finished fetching timestamps of %s for year %s', self.url, year)
+            snapshots = json.loads(response.data.decode('utf-8'))
 
-                self.non_dup = {}
-                self.dup = {}
-                for elem in snapshots:
-                    if elem[1] in self.non_dup.values():
-                        self.dup[elem[0]] = elem[1]
-                    else:
-                        self.non_dup[elem[0]] = elem[1]
-                with concurrent.futures.ThreadPoolExecutor(max_workers=
-                                                           self.thread_number) as executor:
-                    # Start the load operations and mark each future with its URL
-                    # future_to_url = {executor.submit(self.start_profiling,
-                    #                                  snapshot, index):
-                    future_to_url = {executor.submit(self.get_calc_save,
-                                                     snapshot, index):
-                                         snapshot for index, snapshot in enumerate(self.non_dup)}
-                    for future in concurrent.futures.as_completed(future_to_url):
-                        try:
-                            future.result()
-                        except Exception as exc:
-                            self._log.error(exc)
-                    for elem in self.dup:
-                        try:
-                            self.save_to_redis(elem, self.digest_dict[self.dup[elem]], elem)
-                        except KeyError:
-                            self._log.info('Failed to fetch snapshot: %s', elem)
-                    self.redis_db.expire(surt(self.url), self.simhash_expire)
-            except Exception as exc:
-                self._log.error(exc)
-                result = {'status': 'error', 'info': exc}
-                return json.dumps(result, sort_keys=True)
-            time_ended = datetime.datetime.now()
-            result = {'duration': str((time_ended - time_started).seconds)}
-            self._log.info('calculate simhash ended with duration: %d',
-                           (time_ended - time_started).seconds)
-            return json.dumps(result, sort_keys=True)
-        return json.dumps(result, sort_keys=True)
+            if not snapshots:
+                self._log.error('no snapshots found for this year and url combination')
+                return {'status': 'error',
+                        'info': 'no snapshots found for this year and url combination'}
+            snapshots.pop(0)
+            self.total = len(snapshots)
+            self.job_id = self.request.id
+
+            self.non_dup = {}
+            self.dup = {}
+            for elem in snapshots:
+                if elem[1] in self.non_dup.values():
+                    self.dup[elem[0]] = elem[1]
+                else:
+                    self.non_dup[elem[0]] = elem[1]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=
+                                                       self.thread_number) as executor:
+                # Start the load operations and mark each future with its URL
+                # future_to_url = {executor.submit(self.start_profiling,
+                #                                  snapshot, index):
+                future_to_url = {executor.submit(self.get_calc_save,
+                                                    snapshot, index):
+                                        snapshot for index, snapshot in enumerate(self.non_dup)}
+                for future in concurrent.futures.as_completed(future_to_url):
+                    try:
+                        future.result()
+                    except Exception as exc:
+                        self._log.error(exc)
+                for elem in self.dup:
+                    try:
+                        self.save_to_redis(elem, self.digest_dict[self.dup[elem]], elem)
+                    except KeyError:
+                        self._log.info('Failed to fetch snapshot: %s', elem)
+                self.redis_db.expire(surt(self.url), self.simhash_expire)
+        except Exception as exc:
+            self._log.error(exc)
+            return {'status': 'error', 'info': exc}
+        time_ended = datetime.now()
+        self._log.info('calculate simhash ended with duration: %d',
+                        (time_ended - time_started).seconds)
+        return {'duration': str((time_ended - time_started).seconds)}
 
     def save_to_redis(self, snapshot, data, identifier):
         if isinstance(identifier, int):

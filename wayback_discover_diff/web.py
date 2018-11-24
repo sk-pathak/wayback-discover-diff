@@ -2,7 +2,7 @@ import pkg_resources
 from celery import states
 from celery.result import AsyncResult
 from celery.exceptions import CeleryError
-from flask import (Flask, request, jsonify, json)
+from flask import (Flask, request, jsonify)
 from .util import year_simhash, timestamp_simhash, url_is_valid
 
 APP = Flask(__name__, instance_relative_config=True)
@@ -103,16 +103,15 @@ def job_status():
                         'job_id': task.id,
                         'info': task.info.get('info', 1)}
         else:
-            task_info = json.loads(task.info)
-            if task_info.get('status', 0) == 'error':
+            if task.info.get('status', 0) == 'error':
                 # something went wrong in the background job
-                response = {'info': task_info.get('info', 1),
+                response = {'info': task.info.get('info', 1),
                             'job_id': task.id,
-                            'status': task_info.get('status', 0)}
+                            'status': task.info.get('status', 0)}
             else:
                 response = {'status': task.state,
                             'job_id': task.id,
-                            'duration': task_info.get('duration', 1)}
+                            'duration': task.info.get('duration', 1)}
         return jsonify(response)
     except (CeleryError, AttributeError):
         return jsonify({'status': 'error', 'info': 'Cannot get status.'})

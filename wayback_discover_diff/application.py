@@ -36,7 +36,7 @@ if cors:
 
 # Initialize Celery and Redis
 APP.celery = CELERY
-APP.redis_db = StrictRedis.from_url(CFG['redis_uri'])
+APP.redis_db = StrictRedis.from_url(CFG['redis_uri'], decode_responses=True)
 
 # ensure  the instance folder exists
 try:

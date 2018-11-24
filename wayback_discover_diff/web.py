@@ -3,7 +3,7 @@ from celery import (Celery, states)
 from celery.result import AsyncResult
 from celery.exceptions import CeleryError
 from flask import (Flask, request, jsonify, json)
-from .util import year_simhash, timestamp_simhash
+from .util import year_simhash, timestamp_simhash, url_is_valid
 
 APP = Flask(__name__, instance_relative_config=True)
 
@@ -31,47 +31,63 @@ def simhash():
     """Return simhash data for specific URL and year (optional),
     page is also optional.
     """
-    url = request.args.get('url')
-    if not url:
-        return jsonify({'status': 'error', 'info': 'url param is required.'})
-
-    timestamp = request.args.get('timestamp')
-    if not timestamp:
-        year = request.args.get('year')
-        if not year:
-            return jsonify({'status': 'error', 'info': 'year param is required.'})
-        page = request.args.get('page', type=int)
-        if page and page <= 0:
-            return jsonify({'status': 'error', 'info': 'pager param should be > 0.'})
-
-        snapshots = APP.config.get('snapshots')
-        snapshots_per_page = snapshots.get('snapshots_per_page')
-        results = year_simhash(APP.redis_db, url, year, page, snapshots_per_page)
-        if not results:
-            results = {'simhash': 'None'}
-        return jsonify(results)
-    else:
-        # self._log.info('requesting redis db entry for %s %s', url, timestamp)
-        results = timestamp_simhash(APP.redis_db, url, timestamp)
-        if not results:
-            results = {'simhash': 'None'}
-        return jsonify(results)
-
-
-@APP.route('/calculate-simhash')
-def request_url():
     try:
         url = request.args.get('url')
         if not url:
             return jsonify({'status': 'error', 'info': 'url param is required.'})
+        assert url_is_valid(url)
+
+        timestamp = request.args.get('timestamp')
+        if not timestamp:
+            year = request.args.get('year')
+            if not year:
+                return jsonify({'status': 'error', 'info': 'year param is required.'})
+            # validate that year is integer
+            int(year)
+            page = request.args.get('page', type=int)
+            if page and page <= 0:
+                return jsonify({'status': 'error', 'info': 'pager param should be > 0.'})
+
+            snapshots = APP.config.get('snapshots')
+            snapshots_per_page = snapshots.get('snapshots_per_page')
+            results = year_simhash(APP.redis_db, url, year, page, snapshots_per_page)
+            if not results:
+                results = {'simhash': 'None'}
+            return jsonify(results)
+        else:
+            # self._log.info('requesting redis db entry for %s %s', url, timestamp)
+            results = timestamp_simhash(APP.redis_db, url, timestamp)
+            if not results:
+                results = {'simhash': 'None'}
+            return jsonify(results)
+    except ValueError:
+        return jsonify({'status': 'error', 'info': 'year param must be numeric.'})
+    except AssertionError as exc:
+        return jsonify({'status': 'error', 'info': 'invalid url format.'})
+
+
+@APP.route('/calculate-simhash')
+def request_url():
+    """Validate parameters url & timestamp before starting Celery task.
+    """
+    try:
+        url = request.args.get('url')
+        if not url:
+            return jsonify({'status': 'error', 'info': 'url param is required.'})
+        assert url_is_valid(url)
         year = request.args.get('year')
         if not year:
             return jsonify({'status': 'error', 'info': 'year param is required.'})
+        # validate that year is integer
+        int(year)
         res = APP.celery.tasks['Discover'].apply_async(args=[url, year])
         return jsonify({'status': 'started', 'job_id': res.id})
     except CeleryError as exc:
         return jsonify({'status': 'error', 'info': 'Cannot start calculation.'})
-
+    except ValueError as exc:
+        return jsonify({'status': 'error', 'info': 'year param must be numeric.'})
+    except AssertionError as exc:
+        return jsonify({'status': 'error', 'info': 'invalid url format.'})
 
 @APP.route('/job')
 def job_status():
@@ -82,26 +98,20 @@ def job_status():
         task = AsyncResult(job_id, app=APP.celery)
         if task.state == states.PENDING:
             # job did not finish yet
-            response = {
-                'status': task.state,
-                'job_id': task.id,
-                'info': task.info.get('info', 1)
-            }
+            response = {'status': task.state,
+                        'job_id': task.id,
+                        'info': task.info.get('info', 1)}
         else:
             task_info = json.loads(task.info)
             if task_info.get('status', 0) == 'error':
                 # something went wrong in the background job
-                response = {
-                    'info': task_info.get('info', 1),
-                    'job_id': task.id,
-                    'status': task_info.get('status', 0)
-                }
+                response = {'info': task_info.get('info', 1),
+                            'job_id': task.id,
+                            'status': task_info.get('status', 0)}
             else:
-                response = {
-                'status': task.state,
-                'job_id': task.id,
-                'duration': task_info.get('duration', 1)
-            }
+                response = {'status': task.state,
+                            'job_id': task.id,
+                            'duration': task_info.get('duration', 1)}
         return jsonify(response)
-    except AttributeError:
+    except (CeleryError, AttributeError):
         return jsonify({'status': 'error', 'info': 'Cannot get status.'})

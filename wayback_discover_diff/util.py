@@ -3,9 +3,12 @@
 import logging
 from math import ceil
 import os
+import re
+from urllib.parse import urlparse
 import yaml
 from redis.exceptions import RedisError
 from surt import surt
+import tldextract
 
 
 def load_config():
@@ -82,3 +85,19 @@ def handle_results(redis_db, timestamps_to_fetch, url, snapshots_per_page,
     except RedisError as exc:
         logging.error('cannot handle results for url %s page %d (%s)',
                       url, page, exc)
+
+
+EMAIL_RE = re.compile(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
+
+
+def url_is_valid(url):
+    try:
+        if not url:
+            return False
+        if EMAIL_RE.match(url):
+            return False
+        ext = tldextract.extract(url)
+        return ext.domain != '' and ext.suffix != ''
+        return True
+    except (ValueError, AttributeError):
+        return False

@@ -3,14 +3,13 @@ import concurrent.futures
 import logging
 import datetime
 import cProfile
-from math import ceil
 import struct
 import base64
 from itertools import groupby
 import xxhash
 from celery import Task
 import urllib3
-import redis
+from redis import StrictRedis
 from simhash import Simhash
 from surt import surt
 from bs4 import BeautifulSoup
@@ -63,78 +62,11 @@ class Discover(Task):
         self.simhash_size = cfg['simhash']['size']
         self.simhash_expire = cfg['simhash']['expire_after']
         self.http = urllib3.PoolManager(retries=urllib3.Retry(3, redirect=1))
-        self.redis_db = redis.StrictRedis.from_url(cfg['redis_uri'])
-        logfile = cfg['logfile']['name']
-        loglevel = cfg['logfile']['level']
+        self.redis_db = StrictRedis.from_url(cfg['redis_uri'], decode_responses=True)
         self.thread_number = cfg['threads']
         self.snapshots_number = cfg['snapshots']['number_per_year']
-        self.snapshots_per_page = cfg['snapshots']['number_per_page']
         # Initialize logger
         self._log = logging.getLogger(__name__)
-        logging.getLogger(__name__).setLevel(loglevel)
-        logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s',
-                            handlers=[
-                                logging.FileHandler(logfile),
-                                logging.StreamHandler()
-                            ])
-
-    def timestamp_simhash(self, url, timestamp):
-        if not url:
-            self._log.error('did not give url parameter')
-            return json.dumps({'error': 'URL is required.'})
-        if not timestamp:
-            self._log.error('did not give timestamp parameter')
-            return json.dumps({'error': 'Timestamp is required.'})
-        self._log.info('requesting redis db entry for %s %s', url, timestamp)
-        results = self.redis_db.hget(surt(url), timestamp)
-        if results:
-            results = results.decode('utf-8')
-            self._log.info('found entry %s', results)
-            return json.dumps({'simhash': results})
-        self._log.info('entry not found')
-        return json.dumps({'simhash': 'None'})
-
-    def year_simhash(self, url, year, page):
-        if not url:
-            self._log.error('did not give url parameter')
-            return json.dumps({'error': 'URL is required.'})
-        if not year:
-            self._log.error('did not give year parameter')
-            return json.dumps({'error': 'Year is required.'})
-        if page is not None and page < 1:
-            self._log.info('Page param needs to be bigger than zero')
-            return json.dumps({'status': 'error', 'info': 'Page param needs to be bigger than zero.'})
-        self._log.info('requesting redis db entry for %s %s', url, year)
-        results = self.redis_db.hkeys(surt(url))
-        if results:
-            timestamps_to_fetch = []
-            for timestamp in results:
-                timestamp = timestamp.decode('UTF-8')
-                timestamp_year = timestamp[:4]
-                if timestamp_year == str(year):
-                    timestamps_to_fetch.append(timestamp)
-            if timestamps_to_fetch:
-                return self.handle_results(timestamps_to_fetch, url, page)
-        self._log.info('No simhases for this URL and Year')
-        return json.dumps({'simhash': 'None'})
-
-    def handle_results(self, timestamps_to_fetch, url, page):
-        available_simhashes = []
-        if page is not None:
-            number_of_pages = ceil(len(timestamps_to_fetch) / self.snapshots_per_page)
-            if page > number_of_pages:
-                page = number_of_pages
-            if number_of_pages > 0:
-                timestamps_to_fetch = \
-                    timestamps_to_fetch[(page - 1) * self.snapshots_per_page:(page * self.snapshots_per_page)]
-            else:
-                number_of_pages = 1
-        results = self.redis_db.hmget(surt(url), timestamps_to_fetch)
-        for i, simhash in enumerate(results):
-            available_simhashes.append([str(timestamps_to_fetch[i]), simhash.decode('utf-8')])
-        if page is not None:
-            available_simhashes.insert(0,["pages", number_of_pages])
-        return json.dumps(available_simhashes, separators=',:')
 
     def download_snapshot(self, snapshot, i):
         self._log.info('fetching snapshot %d out of %d', i+1, self.total)
@@ -152,7 +84,8 @@ class Discover(Task):
     def get_calc_save(self, snapshot, index):
         response_data = self.download_snapshot(snapshot, index)
         data = extract_html_features(response_data)
-        self.digest_dict[self.non_dup[snapshot]] = calculate_simhash(data, self.simhash_size)
+        simhash = calculate_simhash(data, self.simhash_size)
+        self.digest_dict[self.non_dup[snapshot]] = simhash
         self.save_to_redis(snapshot, simhash, index)
 
     def run(self, url, year):
@@ -232,5 +165,3 @@ class Discover(Task):
         else:
             self._log.info('saving to redis simhash for snapshot %s', identifier)
         self.redis_db.hset(surt(self.url), snapshot, base64.b64encode(struct.pack('L', data)))
-
-

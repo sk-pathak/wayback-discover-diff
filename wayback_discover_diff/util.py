@@ -42,7 +42,7 @@ def timestamp_simhash(redis_db, url, timestamp):
                       url, timestamp, exc)
 
 
-def year_simhash(redis_db, url, year, snapshots_per_page=None, page=None):
+def year_simhash(redis_db, url, year, page=None, snapshots_per_page=None):
     """Get stored simhash data for url, year and page (optional).
     """
     try:

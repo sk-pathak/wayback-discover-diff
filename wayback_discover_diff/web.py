@@ -1,5 +1,5 @@
 import pkg_resources
-from celery import (Celery, states)
+from celery import states
 from celery.result import AsyncResult
 from celery.exceptions import CeleryError
 from flask import (Flask, request, jsonify, json)
@@ -12,11 +12,12 @@ def get_app(config):
     """Utility method to set APP configuration. Its used by application.py.
     """
     APP.config.from_mapping(
-        SECRET_KEY='dev',
+        SECRET_KEY='wayback machine simhash service',
     )
     APP.config.update(CELERYD_HIJACK_ROOT_LOGGER=False)
     APP.config.update(config)
     return APP
+
 
 @APP.route('/')
 def root():
@@ -49,7 +50,7 @@ def simhash():
                 return jsonify({'status': 'error', 'info': 'pager param should be > 0.'})
 
             snapshots = APP.config.get('snapshots')
-            snapshots_per_page = snapshots.get('snapshots_per_page')
+            snapshots_per_page = snapshots.get('number_per_page')
             results = year_simhash(APP.redis_db, url, year, page, snapshots_per_page)
             if not results:
                 results = {'simhash': 'None'}

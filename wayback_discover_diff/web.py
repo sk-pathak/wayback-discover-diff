@@ -81,7 +81,7 @@ def request_url():
             return jsonify({'status': 'error', 'info': 'year param is required.'})
         # validate that year is integer
         int(year)
-        res = APP.celery.tasks['Discover'].apply_async(args=[url, year])
+        res = APP.celery.tasks['Discover'].apply_async(args=[url, year], queue='wayback_discover_diff')
         return jsonify({'status': 'started', 'job_id': res.id})
     except CeleryError as exc:
         return jsonify({'status': 'error', 'info': 'Cannot start calculation.'})

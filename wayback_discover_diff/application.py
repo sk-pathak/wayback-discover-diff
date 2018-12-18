@@ -21,8 +21,10 @@ logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s',
                     )
 
 # Init Celery app
-CELERY = Celery('wayback-discover-diff', broker=CFG['celery_broker'],
-                backend=CFG['celery_backend'])
+CELERY = Celery(CFG['celery_queue_name'], broker=CFG['celery_broker'],
+                backend=CFG['celery_backend'],
+                task_queues=CFG['celery_queue_name'])
+CELERY.conf.task_default_queue = CFG['celery_queue_name']
 CELERY.register_task(Discover(CFG))
 
 # Init Flask app

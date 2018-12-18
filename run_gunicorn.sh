@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Initialize options for gunicorn
 OPTS=(
   --env FLASK_APP=wayback_discover_diff

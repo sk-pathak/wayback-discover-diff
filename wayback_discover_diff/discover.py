@@ -33,7 +33,7 @@ def extract_html_features(html):
     for script in soup(["script", "style"]):
         script.extract()
     text = soup.get_text().lower()
-    translator = str.maketrans('', '', string.punctuation)
+    translator = str.maketrans(string.punctuation, ' '*len(string.punctuation))
     text = text.translate(translator)
     lines = (line.strip() for line in text.splitlines())
     chunks = (phrase.strip() for line in lines for phrase in line.split("  "))

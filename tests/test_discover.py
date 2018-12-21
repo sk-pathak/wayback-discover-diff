@@ -30,7 +30,7 @@ test
 abc
 </body>
 </html>"""
-    features = {'123': 1, 'abc': 4, 'my': 1, 'test': 1, 'title': 1}
+    features = {'123': 1, 'a': 1, 'abc': 3, 'b': 1, 'c': 1, 'my': 1, 'test': 1, 'title': 1}
     assert extract_html_features(html) == features
 
     # handle plain text

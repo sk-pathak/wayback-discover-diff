@@ -46,7 +46,7 @@ def test_no_entry():
     resp = client.get('/simhash?timestamp=20180000000000&url=nonexistingdomain.org')
     assert resp.status_code == 200
     data = json.loads(resp.data.decode('utf-8'))
-    assert data == {}
+    assert data == []
 
 # TODO must mock this
 # def test_start_task():
@@ -88,7 +88,7 @@ def test_task_no_snapshots():
     client = Client(APP, response_wrapper=BaseResponse)
     resp = client.get('/simhash?url=nonexistingdomain.org&year=1999')
     data = json.loads(resp.data.decode('utf-8'))
-    assert data == {}
+    assert data == []
 
 
 # TODO must mock this

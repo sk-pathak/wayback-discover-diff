@@ -59,7 +59,7 @@ def simhash():
             # self._log.info('requesting redis db entry for %s %s', url, timestamp)
             results = timestamp_simhash(APP.redis_db, url, timestamp)
             if not results:
-                results = []
+                results = {}
             return jsonify(results)
     except ValueError:
         return jsonify({'status': 'error', 'info': 'year param must be numeric.'})

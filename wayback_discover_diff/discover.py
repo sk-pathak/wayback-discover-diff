@@ -1,6 +1,7 @@
 import json
 import concurrent.futures
 import logging
+import string
 from datetime import datetime
 import cProfile
 import struct
@@ -22,6 +23,7 @@ def extract_html_features(html):
     """Process HTML document and get key features as text. Steps:
     kill all script and style elements
     get lowercase text
+    remove all punctuation
     break into lines and remove leading and trailing space on each
     break multi-headlines into a line each
     drop blank lines
@@ -31,6 +33,8 @@ def extract_html_features(html):
     for script in soup(["script", "style"]):
         script.extract()
     text = soup.get_text().lower()
+    translator = str.maketrans(string.punctuation, ' '*len(string.punctuation))
+    text = text.translate(translator)
     lines = (line.strip() for line in text.splitlines())
     chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
     text = '\n'.join(chunk for chunk in chunks if chunk)

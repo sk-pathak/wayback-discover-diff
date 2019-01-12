@@ -4,10 +4,17 @@ A Python 3.4 application running a web service that accepts HTTP GET requests an
 
 - /calculate-simhash?url={URL}&year={YEAR}
 
-  Run background task to calculate simhash for all captures of target URL in the specified year.
-
+  Checks if there is a task to calculate simhash for all captures of target URL in the specified year already running.
+  If there isn't, it creates it.
+  
   Return JSON {“status”: “started”, “job_id”: “XXYYZZ (uuid)”}
-
+ 
+  **OR**
+  
+  If there is a task already running it returns its job_id.
+  
+  Return JSON {“status”: “PENDING”, “job_id”: “XXYYZZ (uuid)”}
+ 
 - /simhash?url={URL}&timestamp={timestamp}
   
   Returns JSON {“simhash”: “XXXX”} if capture simhash has already been calculated or None if it fails.

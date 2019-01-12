@@ -52,14 +52,10 @@ def simhash():
             snapshots = APP.config.get('snapshots')
             snapshots_per_page = snapshots.get('number_per_page')
             results = year_simhash(APP.redis_db, url, year, page, snapshots_per_page)
-            if not results:
-                results = []
             return jsonify(results)
         else:
             # self._log.info('requesting redis db entry for %s %s', url, timestamp)
             results = timestamp_simhash(APP.redis_db, url, timestamp)
-            if not results:
-                results = {}
             return jsonify(results)
     except ValueError:
         return jsonify({'status': 'error', 'info': 'year param must be numeric.'})

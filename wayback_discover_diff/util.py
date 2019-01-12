@@ -37,6 +37,10 @@ def timestamp_simhash(redis_db, url, timestamp):
             results = redis_db.hget(surt(url), timestamp)
             if results:
                 return {'simhash': results}
+            results = redis_db.hget(surt(url), timestamp[:4])
+            if results:
+                return {'status': 'NO_CAPTURES', 'captures': []}
+            return {'status': 'NOT_CAPTURED'}
     except RedisError as exc:
         logging.error('error loading simhash data for url %s timestamp %s (%s)',
                       url, timestamp, exc)
@@ -51,11 +55,14 @@ def year_simhash(redis_db, url, year, page=None, snapshots_per_page=None):
             if results:
                 timestamps_to_fetch = []
                 for timestamp in results:
+                    if timestamp == str(year):
+                        return {'status': 'NO_CAPTURES', 'captures': []}
                     if timestamp[:4] == str(year):
                         timestamps_to_fetch.append(timestamp)
                 if timestamps_to_fetch:
                     return handle_results(redis_db, timestamps_to_fetch, url,
                                           snapshots_per_page, page)
+            return {'status': 'NOT_CAPTURED'}
     except RedisError as exc:
         logging.error('error loading simhash data for url %s year %s page %d (%s)',
                       url, year, page, exc)

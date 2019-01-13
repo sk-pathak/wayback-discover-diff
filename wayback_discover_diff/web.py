@@ -95,6 +95,12 @@ def request_url():
             return jsonify({'status': 'error', 'info': 'year param is required.'})
         # validate that year is integer
         int(year)
+        # see if there is an active job for this request
+        pending = APP.celery.control.inspect().active()
+        tasks = list(pending.values())[0]
+        for task in tasks:
+            if task['args'] == "['%s', '%s']" % (url, year):
+                return jsonify({'status': 'PENDING', 'job_id': task['id']})
         res = APP.celery.tasks['Discover'].apply_async(args=[url, year],
             queue=APP.config['celery_queue_name'])
         return jsonify({'status': 'started', 'job_id': res.id})

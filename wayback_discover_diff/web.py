@@ -52,11 +52,29 @@ def simhash():
             snapshots = APP.config.get('snapshots')
             snapshots_per_page = snapshots.get('number_per_page')
             results = year_simhash(APP.redis_db, url, year, page, snapshots_per_page)
-            return jsonify(results)
+            # check if year_simhash produced an error response
+            if isinstance(results,dict):
+                # print error response
+                return jsonify(results)
+            pending = APP.celery.control.inspect().active()
+            tasks = list(pending.values())[0]
+            for task in tasks:
+                if task['args'] == "['%s', '%s']" % (url, year):
+                    return jsonify({'status': 'PENDING', 'captures': results})
+            return jsonify({'job_status': 'COMPLETE', 'captures': results})
         else:
             # self._log.info('requesting redis db entry for %s %s', url, timestamp)
             results = timestamp_simhash(APP.redis_db, url, timestamp)
-            return jsonify(results)
+            # check if timestamp_simhash produced an error response
+            if isinstance(results,dict):
+                # print error response
+                return jsonify(results)
+            pending = APP.celery.control.inspect().active()
+            tasks = list(pending.values())[0]
+            for task in tasks:
+                if task['args'] == "['%s', '%s']" % (url, timestamp[:4]):
+                    return jsonify({'status': 'PENDING', 'captures': results})
+            return jsonify({'status': 'COMPLETE', 'captures': results})
     except ValueError:
         return jsonify({'status': 'error', 'info': 'year param must be numeric.'})
     except AssertionError as exc:

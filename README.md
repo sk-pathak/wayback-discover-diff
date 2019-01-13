@@ -77,7 +77,8 @@ cp conf.yml.example conf.yml
 ## Run
 In order to run this server you should run :
 ```
-bash run_gunicorn.sh
+bash run_gunicorn.sh &
+bash run_celery.sh
 ```
 
 Open http://127.0.0.1:4000 in a browser.

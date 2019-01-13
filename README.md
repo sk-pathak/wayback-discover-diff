@@ -32,21 +32,21 @@ A Python 3.4 application running a web service that accepts HTTP GET requests an
   
   Which returns all the timestamps for which a simhash value exists in the DB for that specific URL and year with the following       format : [["TIMESTAMP_VALUE", "SIMHASH_VALUE"]]
 
-Returns JSON { captures	[…], job_status	"COMPLETE" } if there are simhash values in the DB and that job is completed.
+  Returns JSON { captures	[…], job_status	"COMPLETE" } if there are simhash values in the DB and that job is completed.
 
-**OR**
+  **OR**
 
-Returns JSON { captures	[…], job_status	"PENDING" } if there are simhash values in the DB but that job is still pending.
+  Returns JSON { captures	[…], job_status	"PENDING" } if there are simhash values in the DB but that job is still pending.
 
-**OR**
+  **OR**
 
-Returns JSON {'status': 'error', 'message': 'NOT_CAPTURED'} if that URL and year combination hasn't been hashed yet.
+  Returns JSON {'status': 'error', 'message': 'NOT_CAPTURED'} if that URL and year combination hasn't been hashed yet.
 
-**OR**
+  **OR**
 
-Returns JSON {'status': 'error', 'message': 'NO_CAPTURES'} if the WBM doesn't have snapshots for that year and URL.
+  Returns JSON {'status': 'error', 'message': 'NO_CAPTURES'} if the WBM doesn't have snapshots for that year and URL.
 
-- /simhash?url={URL}&year={YEAR}&page={PAGE_NUMBER}
+  - /simhash?url={URL}&year={YEAR}&page={PAGE_NUMBER}
   
   Which is the same as the request above but, depending on the page size that is set in the conf.yml file, the results are paginated. The response has the following format : [["pages","NUMBER_OF_PAGES"],["TIMESTAMP_VALUE", "SIMHASH_VALUE"]]
   

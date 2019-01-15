@@ -105,6 +105,5 @@ def url_is_valid(url):
             return False
         ext = tldextract.extract(url)
         return ext.domain != '' and ext.suffix != ''
-        return True
     except (ValueError, AttributeError):
         return False

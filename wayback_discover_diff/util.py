@@ -72,7 +72,7 @@ def handle_results(redis_db, timestamps_to_fetch, url, snapshots_per_page,
                    page=None):
     """Utility method used by `year_simhash`
     """
-    available_simhashes = []
+    available_simhashes = [["total number of captures", len(timestamps_to_fetch)]]
     if page:
         number_of_pages = ceil(len(timestamps_to_fetch) / snapshots_per_page)
         if page > number_of_pages:

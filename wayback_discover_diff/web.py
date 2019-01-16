@@ -61,7 +61,7 @@ def simhash():
             for task in tasks:
                 if task['args'] == "['%s', '%s']" % (url, year):
                     return jsonify({'status': 'PENDING', 'captures': results})
-            return jsonify({'job_status': 'COMPLETE', 'captures': results})
+            return jsonify({'status': 'COMPLETE', 'captures': results})
         else:
             # self._log.info('requesting redis db entry for %s %s', url, timestamp)
             results = timestamp_simhash(APP.redis_db, url, timestamp)

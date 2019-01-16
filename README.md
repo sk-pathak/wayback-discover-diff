@@ -30,7 +30,7 @@ A Python 3.4 application running a web service that accepts HTTP GET requests an
   
 - /simhash?url={URL}&year={YEAR}
   
-  Which returns all the timestamps for which a simhash value exists in the DB for that specific URL and year with the following       format : [["TIMESTAMP_VALUE", "SIMHASH_VALUE"]]
+  Which returns all the timestamps for which a simhash value exists in the DB for that specific URL and year with the following       format : [["total number of captures", XXX],["TIMESTAMP_VALUE", "SIMHASH_VALUE"]]
 
   Returns JSON { captures	[…], job_status	"COMPLETE" } if there are simhash values in the DB and that job is completed.
 

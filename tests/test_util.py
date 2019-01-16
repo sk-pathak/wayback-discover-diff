@@ -10,8 +10,11 @@ SAMPLE_REDIS_CONTENT = {
         '20140202131837': 'og2jGKWHsy4=',
         '20140824062257': 'o52jPP0Hg2o=',
         '20160824062257': 'o52jPP0Hg2o='
-        }
-    }
+        },
+    'com,other)/': {
+        '2014': '-1'
+    },
+}
 
 
 class StubRedis(dict):
@@ -49,6 +52,7 @@ class StubRedis(dict):
             out[hkey] = e.get(hkey)
         return out
 
+
 @pytest.mark.parametrize('url,result', [
     ('http://example.com/', True),
     ('other', False)
@@ -65,10 +69,13 @@ def test_url_is_valid(url, result):
 def test_timestamp_simhash(url, timestamp, simhash):
     redis_db = StubRedis()
     res = timestamp_simhash(redis_db, url, timestamp)
-    if simhash:
+    if len(res.keys()) == 1:
         assert res == {'simhash': simhash}
+    elif url == 'http://other.com':
+        assert res == {'status': 'error', 'message': 'NO_CAPTURES'}
     else:
-        assert res is None
+        assert res == {'status': 'error', 'message': 'CAPTURE_NOT_FOUND'}
+
 
 @pytest.mark.parametrize('url,year,count', [
     ('http://example.com', '2014', 3),
@@ -80,7 +87,11 @@ def test_timestamp_simhash(url, timestamp, simhash):
 def test_year_simhash(url, year, count):
     redis_db = StubRedis()
     res = year_simhash(redis_db, url, year)
+    # check if year_simhash produced an error response
+    if isinstance(res,dict):
+        if year == '2014':
+            assert res == {'status': 'error', 'message': 'NO_CAPTURES'}
+        else:
+            assert res == {'status': 'error', 'message': 'NOT_CAPTURED'}
     if count:
-        assert len(res) == count
-    else:
-        assert res is None
+        assert len(res) -1 == count

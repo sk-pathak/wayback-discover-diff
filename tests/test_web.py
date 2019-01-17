@@ -2,6 +2,7 @@ import json
 from redis import StrictRedis
 from werkzeug.test import Client
 from werkzeug.wrappers import BaseResponse, BaseRequest
+from test_util import StubRedis
 
 from wayback_discover_diff.web import get_app
 
@@ -11,8 +12,8 @@ CFG = dict(redis_uri='redis://localhost/9',
            )
 
 APP = get_app(CFG)
-# TODO we must mock this instead of making a real Redis connection
-APP.redis_db = StrictRedis.from_url(CFG['redis_uri'])
+# APP.redis_db = StrictRedis.from_url(CFG['redis_uri'])
+APP.redis_db = StubRedis()
 # TODO we must mock Celery task
 # Initialize Celery and register Discover task.
 # celery = Celery(__name__, broker='redis://'+str(cfg['redis']['host'])+':'+str(cfg['redis']['port']))

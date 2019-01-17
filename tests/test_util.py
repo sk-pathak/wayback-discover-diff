@@ -14,6 +14,9 @@ SAMPLE_REDIS_CONTENT = {
     'com,other)/': {
         '2014': '-1'
     },
+    'org,nonexistingdomain)/': {
+        '1999': '-1'
+    },
 }
 
 
@@ -94,4 +97,4 @@ def test_year_simhash(url, year, count):
         else:
             assert res == {'status': 'error', 'message': 'NOT_CAPTURED'}
     if count:
-        assert len(res) -1 == count
+        assert len(res[0]) == count

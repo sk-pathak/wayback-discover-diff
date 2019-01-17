@@ -72,7 +72,7 @@ def handle_results(redis_db, timestamps_to_fetch, url, snapshots_per_page,
                    page=None):
     """Utility method used by `year_simhash`
     """
-    available_simhashes = [["total number of captures", len(timestamps_to_fetch)]]
+    available_simhashes = []
     if page:
         number_of_pages = ceil(len(timestamps_to_fetch) / snapshots_per_page)
         if page > number_of_pages:
@@ -88,7 +88,7 @@ def handle_results(redis_db, timestamps_to_fetch, url, snapshots_per_page,
             available_simhashes.append([str(timestamps_to_fetch[i]), simhash])
         if page:
             available_simhashes.insert(0, ["pages", number_of_pages])
-        return available_simhashes
+        return [available_simhashes, len(timestamps_to_fetch)]
     except RedisError as exc:
         logging.error('cannot handle results for url %s page %d (%s)',
                       url, page, exc)

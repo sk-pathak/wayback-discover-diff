@@ -11,6 +11,7 @@ import xxhash
 from celery import Task
 import urllib3
 from redis import StrictRedis
+from redis.exceptions import RedisError
 from simhash import Simhash
 from surt import surt
 from bs4 import BeautifulSoup
@@ -116,11 +117,15 @@ class Discover(Task):
             response = self.http.request('GET', wayback_url)
             self._log.info('finished fetching timestamps of %s for year %s', self.url, year)
             snapshots = json.loads(response.data.decode('utf-8'))
-
-            if not snapshots:
-                self._log.error('no snapshots found for this year and url combination')
-                return {'status': 'error',
-                        'info': 'no snapshots found for this year and url combination'}
+            try:
+                if not snapshots:
+                    self._log.error('no snapshots found for this year and url combination')
+                    self.redis_db.hset(surt(self.url), year, -1)
+                    self.redis_db.expire(surt(self.url), self.simhash_expire)
+                    return {'status': 'error',
+                            'info': 'no snapshots found for this year and url combination'}
+            except RedisError as exc:
+                logging.error('error getting simhash data for url %s year %s (%s)', url, year, exc)
             snapshots.pop(0)
             self.total = len(snapshots)
             self.job_id = self.request.id

@@ -17,13 +17,36 @@ A Python 3.4 application running a web service that accepts HTTP GET requests an
  
 - /simhash?url={URL}&timestamp={timestamp}
   
-  Returns JSON {“simhash”: “XXXX”} if capture simhash has already been calculated or None if it fails.
+  Returns JSON {“simhash”: “XXXX”} if that capture's simhash value has already been calculated
+  
+  **OR**
+  
+  Returns JSON {"message": "NO_CAPTURES", "status": "error"} if the WBM has no captures for this year and URL combination.
+  
+  **OR**
+  
+  Returns JSON { "message": "CAPTURE_NOT_FOUND", "status": "error" } if the timestamp does not exist.
+
   
 - /simhash?url={URL}&year={YEAR}
   
-  Which returns all the timestamps for which a simhash value exists in the DB for that specific URL and year with the following       format : [["TIMESTAMP_VALUE", "SIMHASH_VALUE"]]
+  Which returns all the timestamps for which a simhash value exists in the DB for that specific URL and year with the following       format : ["TIMESTAMP_VALUE", "SIMHASH_VALUE"]
 
-- /simhash?url={URL}&year={YEAR}&page={PAGE_NUMBER}
+  Returns JSON { captures	[…], total number of captures: XXX, status	"COMPLETE" } if there are simhash values in the DB and that job is completed.
+
+  **OR**
+
+  Returns JSON { captures	[…], total number of captures: XXX, status	"PENDING" } if there are simhash values in the DB but that job is still pending.
+
+  **OR**
+
+  Returns JSON {'status': 'error', 'message': 'NOT_CAPTURED'} if that URL and year combination hasn't been hashed yet.
+
+  **OR**
+
+  Returns JSON {'status': 'error', 'message': 'NO_CAPTURES'} if the WBM doesn't have snapshots for that year and URL.
+
+  - /simhash?url={URL}&year={YEAR}&page={PAGE_NUMBER}
   
   Which is the same as the request above but, depending on the page size that is set in the conf.yml file, the results are paginated. The response has the following format : [["pages","NUMBER_OF_PAGES"],["TIMESTAMP_VALUE", "SIMHASH_VALUE"]]
   
@@ -54,7 +77,8 @@ cp conf.yml.example conf.yml
 ## Run
 In order to run this server you should run :
 ```
-bash run_gunicorn.sh
+bash run_gunicorn.sh &
+bash run_celery.sh
 ```
 
 Open http://127.0.0.1:4000 in a browser.

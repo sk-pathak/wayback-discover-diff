@@ -37,6 +37,10 @@ def timestamp_simhash(redis_db, url, timestamp):
             results = redis_db.hget(surt(url), timestamp)
             if results:
                 return {'simhash': results}
+            results = redis_db.hget(surt(url), timestamp[:4])
+            if results:
+                return {'status': 'error', 'message': 'NO_CAPTURES'}
+            return {'status': 'error', 'message': 'CAPTURE_NOT_FOUND'}
     except RedisError as exc:
         logging.error('error loading simhash data for url %s timestamp %s (%s)',
                       url, timestamp, exc)
@@ -51,11 +55,14 @@ def year_simhash(redis_db, url, year, page=None, snapshots_per_page=None):
             if results:
                 timestamps_to_fetch = []
                 for timestamp in results:
+                    if timestamp == str(year):
+                        return {'status': 'error', 'message': 'NO_CAPTURES'}
                     if timestamp[:4] == str(year):
                         timestamps_to_fetch.append(timestamp)
                 if timestamps_to_fetch:
                     return handle_results(redis_db, timestamps_to_fetch, url,
                                           snapshots_per_page, page)
+            return {'status': 'error', 'message': 'NOT_CAPTURED'}
     except RedisError as exc:
         logging.error('error loading simhash data for url %s year %s page %d (%s)',
                       url, year, page, exc)
@@ -81,7 +88,7 @@ def handle_results(redis_db, timestamps_to_fetch, url, snapshots_per_page,
             available_simhashes.append([str(timestamps_to_fetch[i]), simhash])
         if page:
             available_simhashes.insert(0, ["pages", number_of_pages])
-        return available_simhashes
+        return [available_simhashes, len(timestamps_to_fetch)]
     except RedisError as exc:
         logging.error('cannot handle results for url %s page %d (%s)',
                       url, page, exc)
@@ -98,6 +105,5 @@ def url_is_valid(url):
             return False
         ext = tldextract.extract(url)
         return ext.domain != '' and ext.suffix != ''
-        return True
     except (ValueError, AttributeError):
         return False

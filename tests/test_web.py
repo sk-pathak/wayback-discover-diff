@@ -2,6 +2,7 @@ import json
 from redis import StrictRedis
 from werkzeug.test import Client
 from werkzeug.wrappers import BaseResponse, BaseRequest
+from test_util import StubRedis
 
 from wayback_discover_diff.web import get_app
 
@@ -11,8 +12,8 @@ CFG = dict(redis_uri='redis://localhost/9',
            )
 
 APP = get_app(CFG)
-# TODO we must mock this instead of making a real Redis connection
-APP.redis_db = StrictRedis.from_url(CFG['redis_uri'])
+# APP.redis_db = StrictRedis.from_url(CFG['redis_uri'])
+APP.redis_db = StubRedis()
 # TODO we must mock Celery task
 # Initialize Celery and register Discover task.
 # celery = Celery(__name__, broker='redis://'+str(cfg['redis']['host'])+':'+str(cfg['redis']['port']))
@@ -46,7 +47,7 @@ def test_no_entry():
     resp = client.get('/simhash?timestamp=20180000000000&url=nonexistingdomain.org')
     assert resp.status_code == 200
     data = json.loads(resp.data.decode('utf-8'))
-    assert data == {}
+    assert data == {'message': 'CAPTURE_NOT_FOUND', 'status': 'error'}
 
 # TODO must mock this
 # def test_start_task():
@@ -88,7 +89,7 @@ def test_task_no_snapshots():
     client = Client(APP, response_wrapper=BaseResponse)
     resp = client.get('/simhash?url=nonexistingdomain.org&year=1999')
     data = json.loads(resp.data.decode('utf-8'))
-    assert data == []
+    assert data == {'message': 'NO_CAPTURES', 'status': 'error'}
 
 
 # TODO must mock this

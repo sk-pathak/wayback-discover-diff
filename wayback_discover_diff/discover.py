@@ -74,11 +74,14 @@ class Discover(Task):
         self._log = logging.getLogger(__name__)
 
     def download_snapshot(self, snapshot, i):
+        """Download capture from WBM and update job status.
+        """
         self._log.info('fetching snapshot %d out of %d', i+1, self.total)
         if i % 10 == 0:
             self.update_state(task_id=self.job_id, state='PENDING',
-                              meta={'info': str(i) + ' captures have been processed'})
-        response = self.http.request('GET', 'http://web.archive.org/web/' + snapshot + 'id_/' + self.url)
+                              meta={'info': '%d out of %d captures have been processed.' % (i, self.total)})
+        response = self.http.request('GET', 'http://web.archive.org/web/%sid_/%s' % (
+                                     snapshot, self.url))
         self._log.info('calculating simhash for snapshot %d out of %d', i, self.total)
         return response.data.decode('utf-8', 'ignore')
 
@@ -87,6 +90,9 @@ class Discover(Task):
                         globals=globals(), locals=locals(), filename='profile.prof')
 
     def get_calc_save(self, snapshot, index):
+        """Download capture, extract HTML features, calculate simhash and save
+        to Redis.
+        """
         response_data = self.download_snapshot(snapshot, index)
         data = extract_html_features(response_data)
         simhash = calculate_simhash(data, self.simhash_size)
@@ -94,6 +100,8 @@ class Discover(Task):
         self.save_to_redis(snapshot, simhash, index)
 
     def run(self, url, year):
+        """Run Celery Task.
+        """
         self.url = url
         time_started = datetime.now()
         self._log.info('calculate simhash started')
@@ -108,12 +116,12 @@ class Discover(Task):
         try:
             self._log.info('fetching timestamps of %s for year %s', self.url, year)
             self.update_state(state='PENDING',
-                                meta={'info': 'Fetching timestamps of '
-                                            + self.url + ' for year ' + year})
-            wayback_url = 'http://web.archive.org/cdx/search/cdx?url=' + self.url + \
-                            '&' + 'from=' + year + '&to=' + year + '&fl=timestamp,digest&output=json'
+                                meta={'info': 'Fetching timestamps of %s for year %s' % (
+                                      self.url, year)})
+            wayback_url = 'http://web.archive.org/cdx/search/cdx?url=%s&from=%s&to=%s&fl=timestamp,digest&output=json' % (
+                self.url, year, year)
             if self.snapshots_number != -1:
-                wayback_url += '&limit=' + str(self.snapshots_number)
+                wayback_url += '&limit=%d' % self.snapshots_number
             response = self.http.request('GET', wayback_url)
             self._log.info('finished fetching timestamps of %s for year %s', self.url, year)
             snapshots = json.loads(response.data.decode('utf-8'))

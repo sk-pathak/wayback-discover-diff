@@ -4,7 +4,7 @@ import logging
 import os
 from celery import Celery
 from flask_cors import CORS
-from redis import StrictRedis
+from redis import StrictRedis, BlockingConnectionPool
 from wayback_discover_diff.util import load_config
 from wayback_discover_diff.discover import Discover
 
@@ -38,7 +38,13 @@ if cors:
 
 # Initialize Celery and Redis
 APP.celery = CELERY
-APP.redis_db = StrictRedis.from_url(CFG['redis_uri'], decode_responses=True)
+APP.redis_db = StrictRedis(
+    connection_pool=BlockingConnectionPool.from_url(
+        CFG['redis_uri'], max_connections=50,
+        timeout=CFG.get('redis_timeout', 10)
+        ),
+    decode_responses=True
+)
 
 # ensure  the instance folder exists
 try:

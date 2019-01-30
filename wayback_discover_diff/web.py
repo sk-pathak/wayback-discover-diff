@@ -20,7 +20,7 @@ def get_app(config):
     return APP
 
 
-def active_task_exists(url, year):
+def get_active_task(url, year):
     """Check for current simhash processing tasks for targe url & year
     """
     try:
@@ -28,11 +28,11 @@ def active_task_exists(url, year):
         tasks = list(pending.values())[0]
         for task in tasks:
             if task['args'] == "['%s', '%s']" % (url, year):
-                return True
-        return False
+                return task
+        return None
     except RedisError:
         # Redis connection timeout is quite common in production Celery.
-        return False
+        return None
 
 
 @APP.route('/')
@@ -74,7 +74,8 @@ def simhash():
                 return jsonify(results_tuple)
             results = results_tuple[0]
             total_captures = results_tuple[1]
-            if active_task_exists(url, year):
+            task = get_active_task(url, year)
+            if task:
                 return jsonify({'status': 'PENDING', 'captures': results,
                                 'total_number_of_captures': total_captures})
             return jsonify({'status': 'COMPLETE', 'captures': results,
@@ -86,7 +87,8 @@ def simhash():
             if isinstance(results,dict):
                 # print error response
                 return jsonify(results)
-            if active_task_exists(url, timestamp[:4]):
+            task = get_active_task(url, timestamp[:4])
+            if task:
                 return jsonify({'status': 'PENDING', 'captures': results})
             return jsonify({'status': 'COMPLETE', 'captures': results})
     except ValueError:
@@ -110,11 +112,9 @@ def request_url():
         # validate that year is integer
         int(year)
         # see if there is an active job for this request
-        pending = APP.celery.control.inspect().active()
-        tasks = list(pending.values())[0]
-        for task in tasks:
-            if task['args'] == "['%s', '%s']" % (url, year):
-                return jsonify({'status': 'PENDING', 'job_id': task['id']})
+        task = get_active_task(url, year)
+        if task:
+            return jsonify({'status': 'PENDING', 'job_id': task['id']})
         res = APP.celery.tasks['Discover'].apply_async(args=[url, year],
             queue=APP.config['celery_queue_name'])
         return jsonify({'status': 'started', 'job_id': res.id})

@@ -1,5 +1,5 @@
 import json
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 import string
 from datetime import datetime
@@ -10,7 +10,8 @@ from itertools import groupby
 import xxhash
 from celery import Task
 import urllib3
-from redis import StrictRedis
+from urllib3.exceptions import HTTPError
+from redis import StrictRedis, BlockingConnectionPool
 from redis.exceptions import RedisError
 from simhash import Simhash
 from surt import surt
@@ -66,9 +67,16 @@ class Discover(Task):
     def __init__(self, cfg):
         self.simhash_size = cfg['simhash']['size']
         self.simhash_expire = cfg['simhash']['expire_after']
-        self.http = urllib3.PoolManager(retries=urllib3.Retry(3, redirect=1))
-        self.redis_db = StrictRedis.from_url(cfg['redis_uri'], decode_responses=True)
-        self.thread_number = cfg['threads']
+        self.http = urllib3.PoolManager(num_pools=50,
+                                        retries=urllib3.Retry(3, redirect=1))
+        self.redis_db = StrictRedis(
+            connection_pool=BlockingConnectionPool.from_url(
+                cfg['redis_uri'], max_connections=50,
+                timeout=cfg.get('redis_timeout', 10)
+                ),
+            decode_responses=True
+            )
+        self.tpool = ThreadPoolExecutor(max_workers=cfg['threads'])
         self.snapshots_number = cfg['snapshots']['number_per_year']
         # Initialize logger
         self._log = logging.getLogger(__name__)
@@ -76,14 +84,20 @@ class Discover(Task):
     def download_snapshot(self, snapshot, i):
         """Download capture from WBM and update job status.
         """
-        self._log.info('fetching snapshot %d out of %d', i+1, self.total)
-        if i % 10 == 0:
-            self.update_state(task_id=self.job_id, state='PENDING',
-                              meta={'info': '%d out of %d captures have been processed.' % (i, self.total)})
-        response = self.http.request('GET', 'http://web.archive.org/web/%sid_/%s' % (
-                                     snapshot, self.url))
-        self._log.info('calculating simhash for snapshot %d out of %d', i, self.total)
-        return response.data.decode('utf-8', 'ignore')
+        try:
+            self._log.info('fetching snapshot %d out of %d', i+1, self.total)
+            if i % 10 == 0:
+                self.update_state(task_id=self.job_id, state='PENDING',
+                                  meta={'info': '%d out of %d captures have been processed.' % (i, self.total)})
+            resp = self.http.request('GET', 'http://web.archive.org/web/%sid_/%s' % (
+                                         snapshot, self.url))
+            return resp.data.decode('utf-8', 'ignore')
+        except HTTPError as exc:
+            self._log.error('cannot fetch capture %s %s (%s)', snapshot,
+                            self.url, exc)
+
+        except RedisError as exc:
+            self._log.error('cannot update job status (%s)', exc)
 
     def start_profiling(self, snapshot, index):
         cProfile.runctx('self.get_calc_save(snapshot, index)',
@@ -94,14 +108,16 @@ class Discover(Task):
         to Redis.
         """
         response_data = self.download_snapshot(snapshot, index)
-        data = extract_html_features(response_data)
-        simhash = calculate_simhash(data, self.simhash_size)
-        self.digest_dict[self.non_dup[snapshot]] = simhash
-        self.save_to_redis(snapshot, simhash, index)
+        if response_data:
+            data = extract_html_features(response_data)
+            simhash = calculate_simhash(data, self.simhash_size)
+            self.digest_dict[self.non_dup[snapshot]] = simhash
+            self.save_to_redis(snapshot, simhash, index)
 
     def run(self, url, year):
         """Run Celery Task.
         """
+        self.job_id = self.request.id
         self.url = url
         time_started = datetime.now()
         self._log.info('calculate simhash started')
@@ -113,68 +129,71 @@ class Discover(Task):
             return {'status': 'error', 'info': 'Year is required.'}
 
         self.digest_dict = {}
+
         try:
             self._log.info('fetching timestamps of %s for year %s', self.url, year)
             self.update_state(state='PENDING',
-                                meta={'info': 'Fetching timestamps of %s for year %s' % (
-                                      self.url, year)})
-            wayback_url = 'http://web.archive.org/cdx/search/cdx?url=%s&from=%s&to=%s&fl=timestamp,digest&output=json' % (
+                              meta={'info': 'Fetching %s timestamps for year %s' % (
+                                    self.url, year)})
+            cdx_url = 'http://web.archive.org/cdx/search/cdx?url=%s&from=%s&to=%s&fl=timestamp,digest&output=json' % (
                 self.url, year, year)
             if self.snapshots_number != -1:
-                wayback_url += '&limit=%d' % self.snapshots_number
-            response = self.http.request('GET', wayback_url)
-            self._log.info('finished fetching timestamps of %s for year %s', self.url, year)
+                cdx_url += '&limit=%d' % self.snapshots_number
+            response = self.http.request('GET', cdx_url)
+            self._log.info('finished fetching timestamps of %s for year %s',
+                           self.url, year)
             snapshots = json.loads(response.data.decode('utf-8'))
-            try:
-                if not snapshots:
-                    self._log.error('no snapshots found for this year and url combination')
-                    self.redis_db.hset(surt(self.url), year, -1)
-                    self.redis_db.expire(surt(self.url), self.simhash_expire)
-                    return {'status': 'error',
-                            'info': 'no snapshots found for this year and url combination'}
-            except RedisError as exc:
-                logging.error('error getting simhash data for url %s year %s (%s)', url, year, exc)
-            snapshots.pop(0)
-            self.total = len(snapshots)
-            self.job_id = self.request.id
-
-            self.non_dup = {}
-            self.dup = {}
-            for elem in snapshots:
-                if elem[1] in self.non_dup.values():
-                    self.dup[elem[0]] = elem[1]
-                else:
-                    self.non_dup[elem[0]] = elem[1]
-            with concurrent.futures.ThreadPoolExecutor(max_workers=
-                                                       self.thread_number) as executor:
-                # Start the load operations and mark each future with its URL
-                # future_to_url = {executor.submit(self.start_profiling,
-                #                                  snapshot, index):
-                future_to_url = {executor.submit(self.get_calc_save,
-                                                    snapshot, index):
-                                        snapshot for index, snapshot in enumerate(self.non_dup)}
-                for future in concurrent.futures.as_completed(future_to_url):
-                    try:
-                        future.result()
-                    except Exception as exc:
-                        self._log.error(exc)
-                for elem in self.dup:
-                    try:
-                        self.save_to_redis(elem, self.digest_dict[self.dup[elem]], elem)
-                    except KeyError:
-                        self._log.info('Failed to fetch snapshot: %s', elem)
+            if not snapshots:
+                self._log.error('no snapshots found for this year and url combination')
+                self.redis_db.hset(surt(self.url), year, -1)
                 self.redis_db.expire(surt(self.url), self.simhash_expire)
-        except Exception as exc:
-            self._log.error(exc)
+                return {'status': 'error',
+                        'info': 'no snapshots found for this year and url combination'}
+        except HttpError as exc:
+            self._log.error('did not get a valid CDX server response for %s (%s)',
+                            cdx_url, exc)
+        except ValueError as exc:
+            self._log.error('invalid CDX query response %s (%s)', cdx_url, exc)
             return {'status': 'error', 'info': exc}
+        except RedisError as exc:
+            self._log.error('error connecting with Redis for url %s year %s (%s)',
+                            url, year, exc)
+            return {'status': 'error', 'info': exc}
+        snapshots.pop(0)
+        self.total = len(snapshots)
+
+        self.non_dup = {}
+        self.dup = {}
+        for elem in snapshots:
+            if elem[1] in self.non_dup.values():
+                self.dup[elem[0]] = elem[1]
+            else:
+                self.non_dup[elem[0]] = elem[1]
+
+            # Start the load operations and mark each future with its URL
+            # future_to_url = {self.tpool.submit(self.start_profiling,
+            #                                    snapshot, index):
+            future_to_url = {self.tpool.submit(self.get_calc_save,
+                                               snapshot, index):
+                             snapshot for index, snapshot in enumerate(self.non_dup)}
+            for future in as_completed(future_to_url):
+                future.result()
+            for elem in self.dup:
+                try:
+                    self.save_to_redis(elem, self.digest_dict[self.dup[elem]], elem)
+                except KeyError:
+                    self._log.info('Failed to fetch snapshot: %s', elem)
+            self.redis_db.expire(surt(self.url), self.simhash_expire)
         time_ended = datetime.now()
         self._log.info('calculate simhash ended with duration: %d',
-                        (time_ended - time_started).seconds)
+                       (time_ended - time_started).seconds)
         return {'duration': str((time_ended - time_started).seconds)}
 
     def save_to_redis(self, snapshot, data, identifier):
-        if isinstance(identifier, int):
-            self._log.info('saving to redis simhash for snapshot %d out of %d', identifier, self.total)
-        else:
-            self._log.info('saving to redis simhash for snapshot %s', identifier)
-        self.redis_db.hset(surt(self.url), snapshot, base64.b64encode(struct.pack('L', data)))
+        try:
+            self._log.info('saving to redis simhash for snapshot %s out of %d',
+                           str(identifier), self.total)
+            self.redis_db.hset(surt(self.url), snapshot,
+                               base64.b64encode(struct.pack('L', data)))
+        except RedisError as exc:
+            self._log.error('cannot save simhash to Redis (%s)', exc)

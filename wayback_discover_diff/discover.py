@@ -67,14 +67,14 @@ class Discover(Task):
     def __init__(self, cfg):
         self.simhash_size = cfg['simhash']['size']
         self.simhash_expire = cfg['simhash']['expire_after']
-        self.http = urllib3.PoolManager(num_pools=50,
-                                        retries=urllib3.Retry(3, redirect=1))
+        self.http = urllib3.HTTPConnectionPool('web.archive.org', maxsize=100,
+                                               retries=urllib3.Retry(3, redirect=1))
         self.redis_db = StrictRedis(
             connection_pool=BlockingConnectionPool.from_url(
                 cfg['redis_uri'], max_connections=50,
-                timeout=cfg.get('redis_timeout', 10)
-                ),
-            decode_responses=True
+                timeout=cfg.get('redis_timeout', 10),
+                decode_responses=True
+                )
             )
         self.tpool = ThreadPoolExecutor(max_workers=cfg['threads'])
         self.snapshots_number = cfg['snapshots']['number_per_year']
@@ -89,8 +89,7 @@ class Discover(Task):
             if i % 10 == 0:
                 self.update_state(task_id=self.job_id, state='PENDING',
                                   meta={'info': '%d out of %d captures have been processed.' % (i, self.total)})
-            resp = self.http.request('GET', 'http://web.archive.org/web/%sid_/%s' % (
-                                         snapshot, self.url))
+            resp = self.http.request('GET', '/web/%sid_/%s' % (snapshot, self.url))
             return resp.data.decode('utf-8', 'ignore')
         except HTTPError as exc:
             self._log.error('cannot fetch capture %s %s (%s)', snapshot,
@@ -135,7 +134,7 @@ class Discover(Task):
             self.update_state(state='PENDING',
                               meta={'info': 'Fetching %s timestamps for year %s' % (
                                     self.url, year)})
-            cdx_url = 'http://web.archive.org/cdx/search/cdx?url=%s&from=%s&to=%s&fl=timestamp,digest&output=json' % (
+            cdx_url = '/cdx/search/cdx?url=%s&from=%s&to=%s&fl=timestamp,digest&output=json' % (
                 self.url, year, year)
             if self.snapshots_number != -1:
                 cdx_url += '&limit=%d' % self.snapshots_number

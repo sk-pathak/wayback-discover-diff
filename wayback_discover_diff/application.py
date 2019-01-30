@@ -41,10 +41,10 @@ APP.celery = CELERY
 APP.redis_db = StrictRedis(
     connection_pool=BlockingConnectionPool.from_url(
         CFG['redis_uri'], max_connections=50,
-        timeout=CFG.get('redis_timeout', 10)
-        ),
-    decode_responses=True
-)
+        timeout=CFG.get('redis_timeout', 10),
+        decode_responses=True
+        )
+    )
 
 # ensure  the instance folder exists
 try:

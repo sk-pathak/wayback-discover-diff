@@ -68,9 +68,8 @@ def simhash():
             snapshots = APP.config.get('snapshots')
             snapshots_per_page = snapshots.get('number_per_page')
             results_tuple = year_simhash(APP.redis_db, url, year, page, snapshots_per_page)
-            # check if year_simhash produced an error response
+            # check if year_simhash produced an error response and return it
             if isinstance(results_tuple,dict):
-                # print error response
                 return jsonify(results_tuple)
             results = results_tuple[0]
             total_captures = results_tuple[1]
@@ -81,11 +80,9 @@ def simhash():
             return jsonify({'status': 'COMPLETE', 'captures': results,
                             'total_number_of_captures': total_captures})
         else:
-            # self._log.info('requesting redis db entry for %s %s', url, timestamp)
             results = timestamp_simhash(APP.redis_db, url, timestamp)
-            # check if timestamp_simhash produced an error response
+            # check if timestamp_simhash produced an error response and return it
             if isinstance(results,dict):
-                # print error response
                 return jsonify(results)
             task = get_active_task(url, timestamp[:4])
             if task:

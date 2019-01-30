@@ -3,6 +3,7 @@ from celery import states
 from celery.result import AsyncResult
 from celery.exceptions import CeleryError
 from flask import (Flask, request, jsonify)
+from redis.exceptions import RedisError
 from .util import year_simhash, timestamp_simhash, url_is_valid
 
 APP = Flask(__name__, instance_relative_config=True)
@@ -17,6 +18,21 @@ def get_app(config):
     APP.config.update(CELERYD_HIJACK_ROOT_LOGGER=False)
     APP.config.update(config)
     return APP
+
+
+def active_task_exists(url, year):
+    """Check for current simhash processing tasks for targe url & year
+    """
+    try:
+        pending = APP.celery.control.inspect().active()
+        tasks = list(pending.values())[0]
+        for task in tasks:
+            if task['args'] == "['%s', '%s']" % (url, year):
+                return True
+        return False
+    except RedisError:
+        # Redis connection timeout is quite common in production Celery.
+        return False
 
 
 @APP.route('/')
@@ -58,12 +74,11 @@ def simhash():
                 return jsonify(results_tuple)
             results = results_tuple[0]
             total_captures = results_tuple[1]
-            pending = APP.celery.control.inspect().active()
-            tasks = list(pending.values())[0]
-            for task in tasks:
-                if task['args'] == "['%s', '%s']" % (url, year):
-                    return jsonify({'status': 'PENDING', 'captures': results, "total_number_of_captures": total_captures})
-            return jsonify({'status': 'COMPLETE', 'captures': results, "total_number_of_captures": total_captures})
+            if active_task_exists(url, year):
+                return jsonify({'status': 'PENDING', 'captures': results,
+                                'total_number_of_captures': total_captures})
+            return jsonify({'status': 'COMPLETE', 'captures': results,
+                            'total_number_of_captures': total_captures})
         else:
             # self._log.info('requesting redis db entry for %s %s', url, timestamp)
             results = timestamp_simhash(APP.redis_db, url, timestamp)
@@ -71,11 +86,8 @@ def simhash():
             if isinstance(results,dict):
                 # print error response
                 return jsonify(results)
-            pending = APP.celery.control.inspect().active()
-            tasks = list(pending.values())[0]
-            for task in tasks:
-                if task['args'] == "['%s', '%s']" % (url, timestamp[:4]):
-                    return jsonify({'status': 'PENDING', 'captures': results})
+            if active_task_exists(url, timestamp[:4]):
+                return jsonify({'status': 'PENDING', 'captures': results})
             return jsonify({'status': 'COMPLETE', 'captures': results})
     except ValueError:
         return jsonify({'status': 'error', 'info': 'year param must be numeric.'})

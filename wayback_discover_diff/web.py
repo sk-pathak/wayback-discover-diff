@@ -26,10 +26,10 @@ def get_active_task(url, year):
     """
     try:
         pending = APP.celery.control.inspect().active()
-        tasks = list(pending.values())[0]
-        for task in tasks:
-            if task['args'] == "['%s', '%s']" % (url, year):
-                return task
+        if pending:
+            for task in list(pending.values())[0]:
+                if task['args'] == "['%s', '%s']" % (url, year):
+                    return task
         return None
     except RedisError:
         # Redis connection timeout is quite common in production Celery.
@@ -138,20 +138,28 @@ def job_status():
             return jsonify({'status': 'error', 'info': 'job_id param is required.'})
         task = AsyncResult(job_id, app=APP.celery)
         if task.state == states.PENDING:
+            if task.info:
+                info = task.info.get('info', 1)
+            else:
+                info = None
             # job did not finish yet
             response = {'status': task.state,
                         'job_id': task.id,
-                        'info': task.info.get('info', 1)}
+                        'info': info}
         else:
-            if task.info.get('status', 0) == 'error':
+            if task.info and task.info.get('status', 0) == 'error':
                 # something went wrong in the background job
                 response = {'info': task.info.get('info', 1),
                             'job_id': task.id,
                             'status': task.info.get('status', 0)}
             else:
+                if task.info:
+                    duration = task.info.get('duration', 1)
+                else:
+                    duration = 1
                 response = {'status': task.state,
                             'job_id': task.id,
-                            'duration': task.info.get('duration', 1)}
+                            'duration': duration}
         return jsonify(response)
     except (CeleryError, AttributeError) as exc:
         APP.logger.error('Cannot get job status of %s, (%s)', job_id, exc)

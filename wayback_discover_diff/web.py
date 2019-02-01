@@ -4,7 +4,8 @@ from celery.result import AsyncResult
 from celery.exceptions import CeleryError
 from flask import (Flask, request, jsonify)
 from redis.exceptions import RedisError
-from .util import year_simhash, timestamp_simhash, url_is_valid
+from .util import (year_simhash, timestamp_simhash, url_is_valid,
+                   compress_captures)
 
 APP = Flask(__name__, instance_relative_config=True)
 
@@ -69,20 +70,22 @@ def simhash():
             snapshots_per_page = snapshots.get('number_per_page')
             results_tuple = year_simhash(APP.redis_db, url, year, page, snapshots_per_page)
             # check if year_simhash produced an error response and return it
-            if isinstance(results_tuple,dict):
+            if isinstance(results_tuple, dict):
                 return jsonify(results_tuple)
-            results = results_tuple[0]
-            total_captures = results_tuple[1]
             task = get_active_task(url, year)
-            if task:
-                return jsonify({'status': 'PENDING', 'captures': results,
-                                'total_number_of_captures': total_captures})
-            return jsonify({'status': 'COMPLETE', 'captures': results,
-                            'total_number_of_captures': total_captures})
+
+            output = dict(captures=results_tuple[0],
+                          total_captures=results_tuple[1],
+                          status='PENDING' if task else 'COMPLETE')
+            if request.args.get('compress'):
+                (captures, hashes) = compress_captures(output['captures'])
+                output['captures'] = captures
+                output['hashes'] = hashes
+            return jsonify(output)
         else:
             results = timestamp_simhash(APP.redis_db, url, timestamp)
             # check if timestamp_simhash produced an error response and return it
-            if isinstance(results,dict):
+            if isinstance(results, dict):
                 return jsonify(results)
             task = get_active_task(url, timestamp[:4])
             if task:

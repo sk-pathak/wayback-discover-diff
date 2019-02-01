@@ -1,10 +1,10 @@
 """SPN Utility methods.
 """
 import logging
+from collections import defaultdict
 from math import ceil
 import os
 import re
-from urllib.parse import urlparse
 import yaml
 from redis.exceptions import RedisError
 from surt import surt
@@ -107,3 +107,32 @@ def url_is_valid(url):
         return ext.domain != '' and ext.suffix != ''
     except (ValueError, AttributeError):
         return False
+
+
+def compress_captures(captures):
+    """Input: [["20130603143716","NRyJrLc2FWA="],["20130402202841","FT6d7Jc3vWA="],...]
+    Output:
+    Captures: [[2013, [06, [03, ['143716', 0]]],
+                      [04, [02, ['202841', 1]]]
+              ]]
+    Hashes: ['NRyJrLc2FWA=', 'FT6d7Jc3vWA=']
+    """
+    hashdict = {}
+    grouped = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for ts, simhash in captures:
+        year, month, day, hms = ts[0:4], ts[4:6], ts[6:8], ts[8:]
+        hashid = hashdict.get(simhash)
+        if hashid is None:
+            hashid = len(hashdict)
+            hashdict[simhash] = hashid
+        cap = [hms, hashid]
+        grouped[int(year)][int(month)][int(day)].append(cap)
+    new_captures = [
+        [y] + [
+            [m] + [
+                [d] + dc for d, dc in mc.items()
+            ] for m, mc in yc.items()
+        ] for y, yc in grouped.items()
+    ]
+    hashes = [hash for hash, hashid in sorted(hashdict.items(), key=lambda x: x[1])]
+    return (new_captures, hashes)

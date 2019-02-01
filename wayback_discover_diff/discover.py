@@ -134,7 +134,10 @@ class Discover(Task):
             self.update_state(state='PENDING',
                               meta={'info': 'Fetching %s timestamps for year %s' % (
                                     self.url, year)})
-            cdx_url = '/cdx/search/cdx?url=%s&from=%s&to=%s&fl=timestamp,digest&output=json' % (
+            # Collapse captures by timestamp to get 1 capture per hour.
+            # Its necessary to reduce the huge number of captures some websites
+            # (e.g. twitter.com has 167k captures for 2018.
+            cdx_url = '/cdx/search/cdx?url=%s&from=%s&to=%s&fl=timestamp,digest&collapse=timestamp:10&output=json' % (
                 self.url, year, year)
             if self.snapshots_number != -1:
                 cdx_url += '&limit=%d' % self.snapshots_number

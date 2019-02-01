@@ -115,8 +115,7 @@ def request_url():
         task = get_active_task(url, year)
         if task:
             return jsonify({'status': 'PENDING', 'job_id': task['id']})
-        res = APP.celery.tasks['Discover'].apply_async(args=[url, year],
-            queue=APP.config['celery_queue_name'])
+        res = APP.celery.tasks['Discover'].apply_async(args=[url, year])
         return jsonify({'status': 'started', 'job_id': res.id})
     except CeleryError as exc:
         return jsonify({'status': 'error', 'info': 'Cannot start calculation.'})

@@ -21,6 +21,8 @@ from bs4 import BeautifulSoup
 urllib3.disable_warnings()
 
 
+TRANSLATOR = str.maketrans(string.punctuation, ' '*len(string.punctuation))
+
 def extract_html_features(html):
     """Process HTML document and get key features as text. Steps:
     kill all script and style elements
@@ -35,8 +37,7 @@ def extract_html_features(html):
     for script in soup(["script", "style"]):
         script.extract()
     text = soup.get_text().lower()
-    translator = str.maketrans(string.punctuation, ' '*len(string.punctuation))
-    text = text.translate(translator)
+    text = text.translate(TRANSLATOR)
     lines = (line.strip() for line in text.splitlines())
     chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
     text = '\n'.join(chunk for chunk in chunks if chunk)

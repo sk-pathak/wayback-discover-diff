@@ -1,4 +1,3 @@
-import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 import string
@@ -42,6 +41,8 @@ def extract_html_features(html):
     chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
     text = '\n'.join(chunk for chunk in chunks if chunk)
     text = text.split()
+    # this frees up memory https://stackoverflow.com/questions/11284643/python-high-memory-usage-with-beautifulsoup
+    soup.decompose()
     return {k: sum(1 for _ in g) for k, g in groupby(sorted(text))}
 
 
@@ -68,8 +69,8 @@ class Discover(Task):
     def __init__(self, cfg):
         self.simhash_size = cfg['simhash']['size']
         self.simhash_expire = cfg['simhash']['expire_after']
-        self.http = urllib3.HTTPConnectionPool('web.archive.org', maxsize=100,
-                                               retries=urllib3.Retry(3, redirect=1))
+        self.http = urllib3.HTTPConnectionPool('web.archive.org', maxsize=50,
+                                               retries=urllib3.Retry(3, redirect=2))
         self.redis_db = StrictRedis(
             connection_pool=BlockingConnectionPool.from_url(
                 cfg['redis_uri'], max_connections=50,
@@ -82,19 +83,16 @@ class Discover(Task):
         # Initialize logger
         self._log = logging.getLogger(__name__)
 
-    def download_snapshot(self, snapshot, i):
+    def download_capture(self, ts):
         """Download capture from WBM and update job status.
+        Return capture body (probably HTML text)
         """
         try:
-            self._log.info('fetching snapshot %d out of %d', i+1, self.total)
-            if i % 10 == 0:
-                self.update_state(task_id=self.job_id, state='PENDING',
-                                  meta={'info': '%d out of %d captures have been processed.' % (i, self.total)})
-            resp = self.http.request('GET', '/web/%sid_/%s' % (snapshot, self.url))
+            self._log.info('fetching capture %s %s', ts, self.url)
+            resp = self.http.request('GET', '/web/%sid_/%s' % (ts, self.url))
             return resp.data.decode('utf-8', 'ignore')
         except HTTPError as exc:
-            self._log.error('cannot fetch capture %s %s (%s)', snapshot,
-                            self.url, exc)
+            self._log.error('cannot fetch capture %s %s (%s)', ts, self.url, exc)
 
         except RedisError as exc:
             self._log.error('cannot update job status (%s)', exc)
@@ -103,16 +101,24 @@ class Discover(Task):
         cProfile.runctx('self.get_calc_save(snapshot, index)',
                         globals=globals(), locals=locals(), filename='profile.prof')
 
-    def get_calc_save(self, snapshot, index):
-        """Download capture, extract HTML features, calculate simhash and save
-        to Redis.
+    def get_calc_save(self, timestamp, digest):
+        """if capture with diplicate digest has already calculate simhash,
+        return that and avoid redownloading and processing. Else, download
+        capture, extract HTML features, calculate simhash and save to Redis.
+
+        The result is a simhash number if capture is duplicate or new. If there
+        is any problem (.e.g not found or cannot be calculated), return None
         """
-        response_data = self.download_snapshot(snapshot, index)
+        if digest in self.seen:
+            self._log.info("already seen %s %s" % (digest, self.seen[digest]))
+            return self.seen[digest]
+
+        response_data = self.download_capture(timestamp)
         if response_data:
             data = extract_html_features(response_data)
-            simhash = calculate_simhash(data, self.simhash_size)
-            self.digest_dict[self.non_dup[snapshot]] = simhash
-            self.save_to_redis(snapshot, simhash, index)
+            if data:
+                self._log.info("calculating simhash")
+                return calculate_simhash(data, self.simhash_size)
 
     def run(self, url, year):
         """Run Celery Task.
@@ -128,75 +134,87 @@ class Discover(Task):
             self._log.error('did not give year parameter')
             return {'status': 'error', 'info': 'Year is required.'}
 
-        self.digest_dict = {}
-
         try:
-            self._log.info('fetching timestamps of %s for year %s', self.url, year)
+            self._log.info('fetching CDX of %s for year %s', self.url, year)
             self.update_state(state='PENDING',
-                              meta={'info': 'Fetching %s timestamps for year %s' % (
+                              meta={'info': 'Fetching %s captures for year %s' % (
                                     self.url, year)})
             # Collapse captures by timestamp to get 1 capture per hour.
             # Its necessary to reduce the huge number of captures some websites
-            # (e.g. twitter.com has 167k captures for 2018.
-            cdx_url = '/cdx/search/cdx?url=%s&from=%s&to=%s&fl=timestamp,digest&collapse=timestamp:10&output=json' % (
+            # (e.g. twitter.com has 167k captures for 2018. Get only 2xx captures.
+            cdx_url = '/cdx/search/cdx?url=%s&from=%s&to=%s&fl=timestamp,digest&collapse=timestamp:10&statuscode=200' % (
                 self.url, year, year)
             if self.snapshots_number != -1:
                 cdx_url += '&limit=%d' % self.snapshots_number
             response = self.http.request('GET', cdx_url)
             self._log.info('finished fetching timestamps of %s for year %s',
                            self.url, year)
-            snapshots = json.loads(response.data.decode('utf-8'))
-            if not snapshots:
-                self._log.error('no snapshots found for this year and url combination')
+            assert response.status == 200
+            assert response.data
+            captures_txt = response.data.decode('utf-8')
+            if not captures_txt:
+                self._log.error('no captures found for this year and url combination')
                 self.redis_db.hset(surt(self.url), year, -1)
                 self.redis_db.expire(surt(self.url), self.simhash_expire)
                 return {'status': 'error',
-                        'info': 'no snapshots found for this year and url combination'}
-        except HttpError as exc:
-            self._log.error('did not get a valid CDX server response for %s (%s)',
-                            cdx_url, exc)
-        except ValueError as exc:
+                        'info': 'no captures found for this year and url combination'}
+        except (AssertionError, ValueError, HTTPError) as exc:
             self._log.error('invalid CDX query response %s (%s)', cdx_url, exc)
             return {'status': 'error', 'info': exc}
         except RedisError as exc:
             self._log.error('error connecting with Redis for url %s year %s (%s)',
                             url, year, exc)
             return {'status': 'error', 'info': exc}
-        snapshots.pop(0)
-        self.total = len(snapshots)
+        captures = captures_txt.strip().split("\n")
+        total = len(captures)
+        self.seen = dict()
+        futures_to_url = {}
+        # calculate simhashes in parallel
+        for cap in captures:
+            (ts, digest) = cap.split(' ')
+            future = self.tpool.submit(self.get_calc_save, ts, digest)
+            futures_to_url[future] = (ts, digest)
+        final_results = {}
+        i = 0
+        for future in as_completed(futures_to_url):
+            cap = futures_to_url[future]
+            simhash = future.result()
+            if simhash:
+                if cap[1] not in self.seen:
+                    self.seen[cap[1]] = simhash
+                final_results[cap[0]] = simhash
+            if i % 10 == 0:
+                self.update_state(
+                    task_id=self.job_id, state='PENDING',
+                    meta={'info': '%d out of %d captures have been processed.' % (i, total)}
+                )
+            i += 1
+        if final_results:
+            # batch write results to Redis
+            try:
+                urlkey = surt(self.url)
+                pipe = self.redis_db.pipeline()
+                for ts, simhash in final_results.items():
+                    if simhash:
+                        pipe.hset(urlkey, ts, base64.b64encode(struct.pack('L', simhash)))
+                pipe.expire(urlkey, self.simhash_expire)
+                pipe.execute()
+                pipe.reset()
+            except RedisError as exc:
+                self._log.error('cannot write simhashes to Redis for URL %s (%s)',
+                                self.url, exc)
 
-        self.non_dup = {}
-        self.dup = {}
-        for elem in snapshots:
-            if elem[1] in self.non_dup.values():
-                self.dup[elem[0]] = elem[1]
-            else:
-                self.non_dup[elem[0]] = elem[1]
-
-            # Start the load operations and mark each future with its URL
-            # future_to_url = {self.tpool.submit(self.start_profiling,
-            #                                    snapshot, index):
-            future_to_url = {self.tpool.submit(self.get_calc_save,
-                                               snapshot, index):
-                             snapshot for index, snapshot in enumerate(self.non_dup)}
-            for future in as_completed(future_to_url):
-                future.result()
-            for elem in self.dup:
-                try:
-                    self.save_to_redis(elem, self.digest_dict[self.dup[elem]], elem)
-                except KeyError:
-                    self._log.info('Failed to fetch snapshot: %s', elem)
-            self.redis_db.expire(surt(self.url), self.simhash_expire)
         time_ended = datetime.now()
         self._log.info('calculate simhash ended with duration: %d',
                        (time_ended - time_started).seconds)
         return {'duration': str((time_ended - time_started).seconds)}
 
-    def save_to_redis(self, snapshot, data, identifier):
+    def save_to_redis(self, ts, data):
         try:
-            self._log.info('saving to redis simhash for snapshot %s out of %d',
-                           str(identifier), self.total)
-            self.redis_db.hset(surt(self.url), snapshot,
+            urlkey = surt(self.url)
+            self._log.info('save simhash to Redis for timestamp %s urlkey %s',
+                           ts, urlkey)
+            self.redis_db.hset(urlkey, ts,
                                base64.b64encode(struct.pack('L', data)))
         except RedisError as exc:
             self._log.error('cannot save simhash to Redis (%s)', exc)

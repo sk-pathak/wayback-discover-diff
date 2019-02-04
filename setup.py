@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='wayback-discover-diff',
-    version='0.1.6.5',
+    version='0.1.6.6',
     description='Calculate wayback machine captures simhash',
     packages=find_packages(),
     zip_safe=False,

@@ -69,8 +69,15 @@ class Discover(Task):
     def __init__(self, cfg):
         self.simhash_size = cfg['simhash']['size']
         self.simhash_expire = cfg['simhash']['expire_after']
+
+        headers = None
+        cdx_auth_token = cfg.get('cdx_auth_token')
+        if cdx_auth_token:
+            headers = dict(cookie='cdx_auth_token=%s' % cdx_auth_token)
+
         self.http = urllib3.HTTPConnectionPool('web.archive.org', maxsize=50,
-                                               retries=urllib3.Retry(3, redirect=2))
+                                               retries=urllib3.Retry(3, redirect=2),
+                                               headers=headers)
         self.redis_db = StrictRedis(
             connection_pool=BlockingConnectionPool.from_url(
                 cfg['redis_uri'], max_connections=50,
@@ -160,11 +167,11 @@ class Discover(Task):
                         'info': 'no captures found for this year and url combination'}
         except (AssertionError, ValueError, HTTPError) as exc:
             self._log.error('invalid CDX query response %s (%s)', cdx_url, exc)
-            return {'status': 'error', 'info': exc}
+            return {'status': 'error', 'info': str(exc)}
         except RedisError as exc:
             self._log.error('error connecting with Redis for url %s year %s (%s)',
                             url, year, exc)
-            return {'status': 'error', 'info': exc}
+            return {'status': 'error', 'info': str(exc)}
         captures = captures_txt.strip().split("\n")
         total = len(captures)
         self.seen = dict()

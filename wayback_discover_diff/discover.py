@@ -3,7 +3,6 @@ import logging
 import string
 from datetime import datetime
 import cProfile
-import struct
 import base64
 from itertools import groupby
 import xxhash
@@ -34,7 +33,7 @@ def extract_html_features(html):
     """
     soup = BeautifulSoup(html, features='lxml')
     for script in soup(["script", "style"]):
-        script.extract()
+        script.decompose()
     text = soup.get_text().lower()
     text = text.translate(TRANSLATOR)
     lines = (line.strip() for line in text.splitlines())
@@ -45,18 +44,20 @@ def extract_html_features(html):
     soup.decompose()
     return {k: sum(1 for _ in g) for k, g in groupby(sorted(text))}
 
-
-def hash_function(x):
-    """Custom FAST hash function used to generate simhash.
-    """
-    return int(xxhash.xxh64(x).hexdigest(), 16)
+# This custom hash function generated ALWAYS the same simhash size despite
+# changing simhash size setting. Using the default, we get the right simhashes.
+# 
+# def hash_function(x):
+#     """Custom FAST hash function used to generate simhash.
+#     """
+#     return int(xxhash.xxh64(x).hexdigest(), 16)
 
 
 def calculate_simhash(features_dict, simhash_size):
     """Calculate simhash for features in a dict. `features_dict` contains data
     like {'text': weight}
     """
-    return Simhash(features_dict, simhash_size, hashfunc=hash_function).value
+    return Simhash(features_dict, simhash_size).value
 
 
 class Discover(Task):
@@ -203,7 +204,8 @@ class Discover(Task):
                 pipe = self.redis_db.pipeline()
                 for ts, simhash in final_results.items():
                     if simhash:
-                        pipe.hset(urlkey, ts, base64.b64encode(struct.pack('L', simhash)))
+                        pipe.hset(urlkey, ts,
+                                  base64.b64encode(str(simhash).encode('ascii')))
                 pipe.expire(urlkey, self.simhash_expire)
                 pipe.execute()
                 pipe.reset()
@@ -222,6 +224,6 @@ class Discover(Task):
             self._log.info('save simhash to Redis for timestamp %s urlkey %s',
                            ts, urlkey)
             self.redis_db.hset(urlkey, ts,
-                               base64.b64encode(struct.pack('L', data)))
+                               base64.b64encode(str(data).encode('ascii')))
         except RedisError as exc:
             self._log.error('cannot save simhash to Redis (%s)', exc)

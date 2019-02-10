@@ -205,8 +205,9 @@ class Discover(Task):
                 for ts, simhash in final_results.items():
                     if simhash:
                         simhash_value = simhash.value
+                        size_in_bytes = (simhash_value.bit_length() + 7) // 8
                         pipe.hset(urlkey, ts,
-                                  base64.b64encode(simhash_value.to_bytes((simhash_value.bit_length() + 7) // 8)))
+                                  base64.b64encode(simhash_value.to_bytes(size_in_bytes, byteorder='little')))
                 pipe.expire(urlkey, self.simhash_expire)
                 pipe.execute()
                 pipe.reset()

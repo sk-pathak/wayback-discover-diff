@@ -230,6 +230,6 @@ class Discover(Task):
             self._log.info('save simhash to Redis for timestamp %s urlkey %s',
                            ts, urlkey)
             self.redis_db.hset(urlkey, ts,
-                               pack_simhash_to_bytes(data))
+                               base64.b64encode(pack_simhash_to_bytes(data)))
         except RedisError as exc:
             self._log.error('cannot save simhash to Redis (%s)', exc)

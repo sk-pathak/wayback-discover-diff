@@ -204,8 +204,9 @@ class Discover(Task):
                 pipe = self.redis_db.pipeline()
                 for ts, simhash in final_results.items():
                     if simhash:
+                        simhash_value = simhash.value
                         pipe.hset(urlkey, ts,
-                                  base64.b64encode(str(simhash).encode('ascii')))
+                                  base64.b64encode(simhash_value.to_bytes((simhash_value.bit_length() + 7) // 8)))
                 pipe.expire(urlkey, self.simhash_expire)
                 pipe.execute()
                 pipe.reset()

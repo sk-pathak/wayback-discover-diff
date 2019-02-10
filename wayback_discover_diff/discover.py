@@ -60,6 +60,12 @@ def calculate_simhash(features_dict, simhash_size):
     return Simhash(features_dict, simhash_size).value
 
 
+def pack_simhash_to_bytes(simhash):
+    simhash_value = simhash.value
+    size_in_bytes = (simhash_value.bit_length() + 7) // 8
+    return simhash_value.to_bytes(size_in_bytes, byteorder='little')
+
+
 class Discover(Task):
     """Custom Celery Task class.
     http://docs.celeryproject.org/en/latest/userguide/tasks.html#custom-task-classes
@@ -205,7 +211,7 @@ class Discover(Task):
                 for ts, simhash in final_results.items():
                     if simhash:
                         pipe.hset(urlkey, ts,
-                                  base64.b64encode(str(simhash).encode('ascii')))
+                                  base64.b64encode(pack_simhash_to_bytes(simhash)))
                 pipe.expire(urlkey, self.simhash_expire)
                 pipe.execute()
                 pipe.reset()
@@ -224,6 +230,6 @@ class Discover(Task):
             self._log.info('save simhash to Redis for timestamp %s urlkey %s',
                            ts, urlkey)
             self.redis_db.hset(urlkey, ts,
-                               base64.b64encode(str(data).encode('ascii')))
+                               base64.b64encode(pack_simhash_to_bytes(data)))
         except RedisError as exc:
             self._log.error('cannot save simhash to Redis (%s)', exc)

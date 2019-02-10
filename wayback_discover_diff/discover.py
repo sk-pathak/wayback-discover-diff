@@ -61,9 +61,9 @@ def calculate_simhash(features_dict, simhash_size):
 
 
 def pack_simhash_to_bytes(simhash):
-    simhash_value = simhash.value
-    size_in_bytes = (simhash_value.bit_length() + 7) // 8
-    return simhash_value.to_bytes(size_in_bytes, byteorder='little')
+    # simhash_value = simhash.value
+    size_in_bytes = (simhash.bit_length() + 7) // 8
+    return simhash.to_bytes(size_in_bytes, byteorder='little')
 
 
 class Discover(Task):

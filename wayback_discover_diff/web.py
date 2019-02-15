@@ -77,7 +77,7 @@ def simhash():
             output = dict(captures=results_tuple[0],
                           total_captures=results_tuple[1],
                           status='PENDING' if task else 'COMPLETE')
-            if request.args.get('compress'):
+            if request.args.get('compress') in ['true', '1']:
                 (captures, hashes) = compress_captures(output['captures'])
                 output['captures'] = captures
                 output['hashes'] = hashes

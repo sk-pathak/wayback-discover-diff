@@ -224,13 +224,3 @@ class Discover(Task):
         self._log.info('calculate simhash ended with duration: %d',
                        (time_ended - time_started).seconds)
         return {'duration': str((time_ended - time_started).seconds)}
-
-    def save_to_redis(self, ts, data):
-        try:
-            urlkey = surt(self.url)
-            self._log.info('save simhash to Redis for timestamp %s urlkey %s',
-                           ts, urlkey)
-            self.redis_db.hset(urlkey, ts,
-                               base64.b64encode(pack_simhash_to_bytes(data)))
-        except RedisError as exc:
-            self._log.error('cannot save simhash to Redis (%s)', exc)

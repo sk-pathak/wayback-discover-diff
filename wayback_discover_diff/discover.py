@@ -195,6 +195,8 @@ class Discover(Task):
             cap = futures_to_url[future]
             simhash = future.result()
             if simhash:
+                # This encoding is necessary to store simhash data in Redis.
+                simhash = base64.b64encode(pack_simhash_to_bytes(simhash))
                 if cap[1] not in self.seen:
                     self.seen[cap[1]] = simhash
                 final_results[cap[0]] = simhash
@@ -204,18 +206,15 @@ class Discover(Task):
                     meta={'info': '%d out of %d captures have been processed.' % (i, total)}
                 )
             i += 1
+        self._log.info('Final results for %s and year %s are %d', self.url,
+                       year, len(final_results))
         if final_results:
-            # batch write results to Redis
+            # write results to Redis
             try:
                 urlkey = surt(self.url)
-                pipe = self.redis_db.pipeline()
-                for ts, simhash in final_results.items():
-                    if simhash:
-                        pipe.hset(urlkey, ts,
-                                  base64.b64encode(pack_simhash_to_bytes(simhash)))
-                pipe.expire(urlkey, self.simhash_expire)
-                pipe.execute()
-                pipe.reset()
+                self._log.info('saving to key %s', urlkey)
+                self.redis_db.hmset(urlkey, final_results)
+                self.redis_db.expire(urlkey, self.simhash_expire)
             except RedisError as exc:
                 self._log.error('cannot write simhashes to Redis for URL %s (%s)',
                                 self.url, exc)

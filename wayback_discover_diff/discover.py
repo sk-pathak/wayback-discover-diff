@@ -5,7 +5,6 @@ from datetime import datetime
 import cProfile
 import base64
 from itertools import groupby
-import xxhash
 from celery import Task
 import urllib3
 from urllib3.exceptions import HTTPError
@@ -46,7 +45,9 @@ def extract_html_features(html):
 
 # This custom hash function generated ALWAYS the same simhash size despite
 # changing simhash size setting. Using the default, we get the right simhashes.
-# 
+#
+# import xxhash
+#
 # def hash_function(x):
 #     """Custom FAST hash function used to generate simhash.
 #     """

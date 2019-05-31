@@ -78,7 +78,9 @@ class Discover(Task):
         self.simhash_size = cfg['simhash']['size']
         self.simhash_expire = cfg['simhash']['expire_after']
 
-        headers = None
+        headers = {'User-Agent': 'wayback-discover-diff',
+                   'Accept-Encoding': 'gzip,deflate',
+                   'Connection': 'keep-alive'}
         cdx_auth_token = cfg.get('cdx_auth_token')
         if cdx_auth_token:
             headers = dict(cookie='cdx_auth_token=%s' % cdx_auth_token)
@@ -109,20 +111,15 @@ class Discover(Task):
         except HTTPError as exc:
             self._log.error('cannot fetch capture %s %s (%s)', ts, self.url, exc)
 
-        except RedisError as exc:
-            self._log.error('cannot update job status (%s)', exc)
-
     def start_profiling(self, snapshot, index):
-        cProfile.runctx('self.get_calc_save(snapshot, index)',
+        cProfile.runctx('self.get_calc(snapshot, index)',
                         globals=globals(), locals=locals(), filename='profile.prof')
 
-    def get_calc_save(self, timestamp, digest):
-        """if capture with diplicate digest has already calculate simhash,
-        return that and avoid redownloading and processing. Else, download
-        capture, extract HTML features, calculate simhash and save to Redis.
-
-        The result is a simhash number if capture is duplicate or new. If there
-        is any problem (.e.g not found or cannot be calculated), return None
+    def get_calc(self, timestamp, digest):
+        """if a capture with an equal digest has been already processed,
+        return cached simhash and avoid redownloading and processing. Else,
+        download capture, extract HTML features and calculate simhash.
+        Return None if any problem occurs (e.g. HTTP error or cannot calculate)
         """
         if digest in self.seen:
             self._log.info("already seen %s %s" % (digest, self.seen[digest]))
@@ -148,7 +145,7 @@ class Discover(Task):
         if not year:
             self._log.error('did not give year parameter')
             return {'status': 'error', 'info': 'Year is required.'}
-
+        urlkey = surt(self.url)
         try:
             self._log.info('fetching CDX of %s for year %s', self.url, year)
             self.update_state(state='PENDING',
@@ -166,14 +163,13 @@ class Discover(Task):
             self._log.info('finished fetching timestamps of %s for year %s',
                            self.url, year)
             assert response.status == 200
-            assert response.data
-            captures_txt = response.data.decode('utf-8')
-            if not captures_txt:
-                self._log.error('no captures found for this year and url combination')
-                self.redis_db.hset(surt(self.url), year, -1)
-                self.redis_db.expire(surt(self.url), self.simhash_expire)
+            if not response.data:
+                self._log.info('no captures found for %s %s', self.url, year)
+                self.redis_db.hset(urlkey, year, -1)
+                self.redis_db.expire(urlkey, self.simhash_expire)
                 return {'status': 'error',
                         'info': 'no captures found for this year and url combination'}
+            captures_txt = response.data.decode('utf-8')
         except (AssertionError, ValueError, HTTPError) as exc:
             self._log.error('invalid CDX query response %s (%s)', cdx_url, exc)
             return {'status': 'error', 'info': str(exc)}
@@ -188,7 +184,7 @@ class Discover(Task):
         # calculate simhashes in parallel
         for cap in captures:
             (ts, digest) = cap.split(' ')
-            future = self.tpool.submit(self.get_calc_save, ts, digest)
+            future = self.tpool.submit(self.get_calc, ts, digest)
             futures_to_url[future] = (ts, digest)
         final_results = {}
         i = 0
@@ -212,7 +208,6 @@ class Discover(Task):
         if final_results:
             # write results to Redis
             try:
-                urlkey = surt(self.url)
                 self._log.info('saving to key %s', urlkey)
                 self.redis_db.hmset(urlkey, final_results)
                 self.redis_db.expire(urlkey, self.simhash_expire)

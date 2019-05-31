@@ -192,11 +192,10 @@ class Discover(Task):
             cap = futures_to_url[future]
             simhash = future.result()
             if simhash:
-                # This encoding is necessary to store simhash data in Redis.
-                simhash = base64.b64encode(pack_simhash_to_bytes(simhash))
                 if cap[1] not in self.seen:
                     self.seen[cap[1]] = simhash
-                final_results[cap[0]] = simhash
+                # This encoding is necessary to store simhash data in Redis.
+                final_results[cap[0]] = base64.b64encode(pack_simhash_to_bytes(simhash))
             if i % 10 == 0:
                 self.update_state(
                     task_id=self.job_id, state='PENDING',

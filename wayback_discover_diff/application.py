@@ -1,6 +1,6 @@
 """application.py -- top-level web application for wayback-discover-diff.
 """
-import logging
+import logging.config
 import os
 from celery import Celery
 from flask_cors import CORS
@@ -12,13 +12,9 @@ from wayback_discover_diff.discover import Discover
 CFG = load_config()
 
 # Init logging
-logfile = CFG['logfile']['name']
-loglevel = CFG['logfile']['level']
-logging.getLogger(__name__).setLevel(loglevel)
-logging.basicConfig(format='%(asctime)s %(name)s %(levelname)s %(message)s',
-                    handlers=[logging.FileHandler(logfile),
-                              logging.StreamHandler()]
-                    )
+logconf = CFG.get('logging')
+if logconf:
+    logging.config.dictConfig(logconf)
 
 # Init Celery app
 CELERY = Celery(config_source=CFG['celery'])

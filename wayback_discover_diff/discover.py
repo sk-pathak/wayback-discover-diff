@@ -98,7 +98,7 @@ class Discover(Task):
         self.tpool = ThreadPoolExecutor(max_workers=cfg['threads'])
         self.snapshots_number = cfg['snapshots']['number_per_year']
         # Initialize logger
-        self._log = logging.getLogger(__name__)
+        self._log = logging.getLogger('wayback_discover_diff.worker')
 
     def download_capture(self, ts):
         """Download capture from WBM and update job status.

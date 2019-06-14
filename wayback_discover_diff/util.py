@@ -62,6 +62,7 @@ def year_simhash(redis_db, url, year, page=None, snapshots_per_page=None):
                 if timestamps_to_fetch:
                     return handle_results(redis_db, timestamps_to_fetch, url,
                                           snapshots_per_page, page)
+            # TODO return empty result and NOT error.
             return {'status': 'error', 'message': 'NOT_CAPTURED'}
     except RedisError as exc:
         logging.error('error loading simhash data for url %s year %s page %d (%s)',

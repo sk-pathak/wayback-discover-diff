@@ -18,10 +18,6 @@ celery:
     task_soft_time_limit: 7200
     worker_max_tasks_per_child: 100
 
-logfile:
-    name: "log.txt"
-    level: 20
-
 threads: 8
 
 snapshots:
@@ -31,3 +27,22 @@ snapshots:
 cors:
     ['http://localhost:3000',
     'http://localhost:3001']
+
+logging:
+  version: 1
+  disable_existing_loggers: false
+  handlers:
+    console: { class: logging.StreamHandler, formatter: default }
+  formatters:
+    default:
+      format: "%(asctime)s %(levelname)s %(thread)d %(name)s %(message)s"
+      datefmt: "%Y-%m-%d %H:%M:%S"
+  root:
+    level: DEBUG
+  loggers:
+    wayback_discover_diff.web:
+      handlers: [console]
+	  level: DEBUG
+    wayback_discover_diff.worker:
+      handlers: [console]
+	  level: DEBUG

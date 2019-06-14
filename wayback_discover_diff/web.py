@@ -1,3 +1,4 @@
+import logging
 import pkg_resources
 from celery import states
 from celery.result import AsyncResult
@@ -8,7 +9,7 @@ from .util import (year_simhash, timestamp_simhash, url_is_valid,
                    compress_captures)
 
 APP = Flask(__name__, instance_relative_config=True)
-
+APP._logger = logging.getLogger('wayback_discover_diff.web')
 
 def get_app(config):
     """Utility method to set APP configuration. Its used by application.py.
@@ -92,10 +93,10 @@ def simhash():
                 return jsonify({'status': 'PENDING', 'captures': results})
             return jsonify({'status': 'COMPLETE', 'captures': results})
     except ValueError as exc:
-        APP.logger.error('Cannot get simhash of %s, (%s)', url, exc)
+        APP._logger.error('Cannot get simhash of %s, (%s)', url, exc)
         return jsonify({'status': 'error', 'info': 'year param must be numeric.'})
     except AssertionError as exc:
-        APP.logger.error('Invalid %s, (%s)', url, exc)
+        APP._logger.error('Invalid %s, (%s)', url, exc)
         return jsonify({'status': 'error', 'info': 'invalid url format.'})
 
 
@@ -120,13 +121,16 @@ def request_url():
         res = APP.celery.tasks['Discover'].apply_async(args=[url, year])
         return jsonify({'status': 'started', 'job_id': res.id})
     except CeleryError as exc:
-        APP.logger.error('Cannot calculate simhash of %s, %s (%s)', url, year, exc)
+        APP._logger.error('Cannot calculate simhash of %s, %s (%s)', url, year,
+                          exc)
         return jsonify({'status': 'error', 'info': 'Cannot start calculation.'})
     except ValueError as exc:
-        APP.logger.error('Cannot calculate simhash of %s, no year (%s)', url, exc)
+        APP._logger.error('Cannot calculate simhash of %s, no year (%s)',
+                          url, exc)
         return jsonify({'status': 'error', 'info': 'year param must be numeric.'})
     except AssertionError as exc:
-        APP.logger.error('Cannot calculate simhash of %s, invalid url (%s)', url, exc)
+        APP._logger.error('Cannot calculate simhash of %s, invalid url (%s)',
+                          url, exc)
         return jsonify({'status': 'error', 'info': 'invalid url format.'})
 
 
@@ -162,5 +166,5 @@ def job_status():
                             'duration': duration}
         return jsonify(response)
     except (CeleryError, AttributeError) as exc:
-        APP.logger.error('Cannot get job status of %s, (%s)', job_id, exc)
+        APP._logger.error('Cannot get job status of %s, (%s)', job_id, exc)
         return jsonify({'status': 'error', 'info': 'Cannot get status.'})

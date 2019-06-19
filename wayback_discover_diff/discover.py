@@ -13,6 +13,7 @@ from redis.exceptions import RedisError
 from simhash import Simhash
 from surt import surt
 from bs4 import BeautifulSoup
+from werkzeug.urls import url_fix
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
@@ -106,7 +107,8 @@ class Discover(Task):
         """
         try:
             self._log.info('fetching capture %s %s', ts, self.url)
-            resp = self.http.request('GET', '/web/%sid_/%s' % (ts, self.url))
+            resp = self.http.request('GET', '/web/%sid_/%s' % (
+                                     ts, url_fix(self.url)))
             return resp.data.decode('utf-8', 'ignore')
         except HTTPError as exc:
             self._log.error('cannot fetch capture %s %s (%s)', ts, self.url, exc)
@@ -155,11 +157,13 @@ class Discover(Task):
             # TODO increase that in the future when we can handle more captures.
             # Its necessary to reduce the huge number of captures some websites
             # (e.g. twitter.com has 167k captures for 2018. Get only 2xx captures.
-            cdx_url = '/cdx/search/cdx?url=%s&from=%s&to=%s&fl=timestamp,digest&collapse=timestamp:9&statuscode=200' % (
-                self.url, year, year)
+            fields = {'url': self.url, 'from': year, 'to': year,
+                      'statuscode': 200, 'fl': 'timestamp,digest',
+                      'collapse': 'timestamp:9'}
             if self.snapshots_number != -1:
-                cdx_url += '&limit=%d' % self.snapshots_number
-            response = self.http.request('GET', cdx_url)
+                fields['limit'] = self.snapshots_number
+            response = self.http.request('GET', '/cdx/search/cdx',
+                                         fields=fields)
             self._log.info('finished fetching timestamps of %s for year %s',
                            self.url, year)
             assert response.status == 200

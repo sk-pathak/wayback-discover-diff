@@ -87,8 +87,7 @@ class Discover(Task):
             headers = dict(cookie='cdx_auth_token=%s' % cdx_auth_token)
 
         self.http = urllib3.HTTPConnectionPool('web.archive.org', maxsize=50,
-                                               retries=urllib3.Retry(3, redirect=2),
-                                               headers=headers)
+                                               retries=4, headers=headers)
         self.redis_db = StrictRedis(
             connection_pool=BlockingConnectionPool.from_url(
                 cfg['redis_uri'], max_connections=50,

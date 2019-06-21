@@ -41,6 +41,11 @@ def test_simhash_parameters():
     data = json.loads(resp.data.decode('utf-8'))
     assert data == dict(status='error', info='invalid url format.')
 
+    # StubRedis already has simhash data for 20140202131837 and example.com
+    resp = client.get('/simhash?url=example.com&timestamp=20140202131837')
+    data = json.loads(resp.data.decode('utf-8'))
+    assert data.get('simhash') == 'og2jGKWHsy4='
+
 
 def test_no_entry():
     client = Client(APP, response_wrapper=BaseResponse)

@@ -1,5 +1,8 @@
+# -*- coding: utf-8 -*-
+import mock
+from test_util import StubRedis
 from wayback_discover_diff.discover import (extract_html_features,
-    calculate_simhash)
+    calculate_simhash, Discover)
 
 
 def test_extract_html_features():
@@ -70,4 +73,28 @@ abc
 
 def test_calculate_simhash():
     features = {'two': 2, 'three': 3, 'one': 1}
-    assert calculate_simhash(features, 128) == 1194485672667776276
+    assert calculate_simhash(features, 128) == 66237222457941138286276456718971054176
+
+
+CFG = {
+    'simhash': {
+        'size': 256,
+        'expire_after': 86400
+        },
+    'redis_uri': 'redis://localhost:6379/1',
+    'threads': 5,
+    'snapshots': {
+        'number_per_year': -1,
+        'number_per_page': 600
+        }
+    }
+
+@mock.patch('wayback_discover_diff.discover.StrictRedis')
+def test_worker_download(Redis):
+    Redis.return_value = StubRedis()
+    task = Discover(CFG)
+    # This capture performs redirects inside WBM. It has CDX status=200 but
+    # its really a redirect (This is a common WBM issue). We test that
+    # redirects work fine.
+    task.url = 'http://era.artiste.universalmusic.fr/'
+    assert task.download_capture('20180716140623')

@@ -112,7 +112,7 @@ class Discover(Task):
             return resp.data.decode('utf-8', 'ignore')
         except HTTPError as exc:
             self._log.error('cannot fetch capture %s %s (%s)', ts, self.url,
-                            exc)
+                            str(exc))
             return None
 
     def start_profiling(self, snapshot, index):

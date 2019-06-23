@@ -21,6 +21,7 @@ urllib3.disable_warnings()
 
 TRANSLATOR = str.maketrans(string.punctuation, ' '*len(string.punctuation))
 
+
 def extract_html_features(html):
     """Process HTML document and get key features as text. Steps:
     kill all script and style elements
@@ -110,11 +111,14 @@ class Discover(Task):
                                      ts, url_fix(self.url)))
             return resp.data.decode('utf-8', 'ignore')
         except HTTPError as exc:
-            self._log.error('cannot fetch capture %s %s (%s)', ts, self.url, exc)
+            self._log.error('cannot fetch capture %s %s (%s)', ts, self.url,
+                            exc)
+            return None
 
     def start_profiling(self, snapshot, index):
         cProfile.runctx('self.get_calc(snapshot, index)',
-                        globals=globals(), locals=locals(), filename='profile.prof')
+                        globals=globals(), locals=locals(),
+                        filename='profile.prof')
 
     def get_calc(self, timestamp, digest):
         """if a capture with an equal digest has been already processed,
@@ -132,6 +136,7 @@ class Discover(Task):
             if data:
                 self._log.info("calculating simhash")
                 return calculate_simhash(data, self.simhash_size)
+        return None
 
     def run(self, url, year):
         """Run Celery Task.
@@ -174,11 +179,11 @@ class Discover(Task):
                         'info': 'no captures found for this year and url combination'}
             captures_txt = response.data.decode('utf-8')
         except (AssertionError, ValueError, HTTPError) as exc:
-            self._log.error('invalid CDX query response %s (%s)', cdx_url, exc)
+            self._log.error('invalid CDX query response (%s)', exc)
             return {'status': 'error', 'info': str(exc)}
         except RedisError as exc:
             self._log.error('error connecting with Redis for url %s year %s (%s)',
-                            url, year, exc)
+                            url, year, str(exc))
             return {'status': 'error', 'info': str(exc)}
         captures = captures_txt.strip().split("\n")
         total = len(captures)
@@ -215,7 +220,7 @@ class Discover(Task):
                 self.redis_db.expire(urlkey, self.simhash_expire)
             except RedisError as exc:
                 self._log.error('cannot write simhashes to Redis for URL %s (%s)',
-                                self.url, exc)
+                                self.url, str(exc))
 
         time_ended = datetime.now()
         self._log.info('calculate simhash ended with duration: %d',

@@ -5,28 +5,25 @@ jobs:
     docker:
       - image: circleci/python:3.5
     steps:
+      - checkout
+
       - run:
           name: Install Dependencies
           command: |
             python -m venv venv
             . venv/bin/activate
-            python setup.py install
+            python setup.py develop
 
       - run:
           name: Tests
           command: |
             . venv/bin/activate
-            coverage run run_tests.py -v web_monitoring/tests/
-      - run:
-          name: Coverage
-          command: |
-            . venv/bin/activate
-            coverage report -m
+            pytest tests
       - run:
           name: Code linting
           command: |
             . venv/bin/activate
-            pyflakes web_monitoring
+            pylint wayback_discover_diff
 
 workflows:
   version: 2

@@ -87,6 +87,8 @@ class Discover(Task):
     def __init__(self, cfg):
         self.simhash_size = cfg['simhash']['size']
         self.simhash_expire = cfg['simhash']['expire_after']
+        if self.simhash_size > 512:
+            raise Exception('do not support simhash longer than 512')
 
         headers = {'User-Agent': 'wayback-discover-diff',
                    'Accept-Encoding': 'gzip,deflate',

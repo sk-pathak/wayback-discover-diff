@@ -2,7 +2,7 @@
 import mock
 from test_util import StubRedis
 from wayback_discover_diff.discover import (extract_html_features,
-    calculate_simhash, Discover)
+    calculate_simhash, pack_simhash_to_bytes, Discover)
 
 
 def test_extract_html_features():
@@ -98,3 +98,66 @@ def test_worker_download(Redis):
     # redirects work fine.
     task.url = 'http://era.artiste.universalmusic.fr/'
     assert task.download_capture('20180716140623')
+
+
+def test_regular_hash():
+    features = {
+        '2019': 1,
+        'advanced': 1,
+        'google': 1,
+        'google©': 1,
+        'history': 1,
+        'insearch': 1,
+        'more': 1,
+        'optionssign': 1,
+        'privacy': 1,
+        'programsbusiness': 1,
+        'searchimagesmapsplayyoutubenewsgmaildrivemorecalendartranslatemobilebooksshoppingbloggerfinancephotosvideosdocseven': 1,
+        'searchlanguage': 1,
+        'settingsweb': 1,
+        'solutionsabout': 1,
+        'terms': 1,
+        'toolsadvertising': 1,
+        '»account': 1
+    }
+    h = calculate_simhash(features, 128)
+    assert h.bit_length() == 128
+    h_bytes = pack_simhash_to_bytes(h)
+    assert len(h_bytes) == 16
+
+
+def test_shortened_hash():
+    h_size = 128
+    features = {
+        'about': 1,
+        'accountsearchmapsyoutubeplaynewsgmailcontactsdrivecalendartranslatephotosshoppingmorefinancedocsbooksbloggerhangoutskeepjamboardearthcollectionseven': 1,
+        'at': 1,
+        'data': 1,
+        'feedbackadvertisingbusiness': 1,
+        'from': 1,
+        'gmailimagessign': 1,
+        'google': 3,
+        'helpsend': 1,
+        'in': 2,
+        'inappropriate': 1,
+        'library': 1,
+        'local': 1,
+        'more': 1,
+        'new': 1,
+        'predictions': 1,
+        'privacytermssettingssearch': 1,
+        'remove': 1,
+        'report': 1,
+        'searchhistorysearch': 1,
+        'searchyour': 1,
+        'settingsadvanced': 1,
+        'skills': 1,
+        'store': 1,
+        'with': 1,
+        'your': 1,
+        '×develop': 1
+    }
+    h = calculate_simhash(features, h_size)
+    assert h.bit_length() != h_size
+    h_bytes = pack_simhash_to_bytes(h, h_size)
+    assert len(h_bytes) == h_size // 8

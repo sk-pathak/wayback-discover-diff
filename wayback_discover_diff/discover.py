@@ -63,9 +63,12 @@ def calculate_simhash(features_dict, simhash_size):
     return Simhash(features_dict, simhash_size).value
 
 
-def pack_simhash_to_bytes(simhash):
+def pack_simhash_to_bytes(simhash, simhash_size=None):
     # simhash_value = simhash.value
-    size_in_bytes = (simhash.bit_length() + 7) // 8
+    if simhash_size is None:
+        size_in_bytes = (simhash.bit_length() + 7) // 8
+    else:
+        size_in_bytes = simhash_size // 8
     return simhash.to_bytes(size_in_bytes, byteorder='little')
 
 
@@ -203,7 +206,7 @@ class Discover(Task):
                 if cap[1] not in self.seen:
                     self.seen[cap[1]] = simhash
                 # This encoding is necessary to store simhash data in Redis.
-                final_results[cap[0]] = base64.b64encode(pack_simhash_to_bytes(simhash))
+                final_results[cap[0]] = base64.b64encode(pack_simhash_to_bytes(simhash, self.simhash_size))
             if i % 10 == 0:
                 self.update_state(
                     task_id=self.job_id, state='PENDING',

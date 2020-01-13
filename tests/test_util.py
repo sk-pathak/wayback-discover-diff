@@ -58,7 +58,10 @@ class StubRedis(dict):
 
 @pytest.mark.parametrize('url,result', [
     ('http://example.com/', True),
-    ('other', False)
+    ('other', False),
+    ('torrent:something.gr/file', False),
+    ('tel:00302310123456', False),
+    ('loudfi1@libero.it', False)
     ])
 def test_url_is_valid(url, result):
     assert url_is_valid(url) == result

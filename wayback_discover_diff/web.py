@@ -93,10 +93,11 @@ def simhash():
                 return jsonify({'status': 'PENDING', 'captures': results})
             return jsonify({'status': 'COMPLETE', 'captures': results})
     except ValueError as exc:
-        APP._logger.error('Cannot get simhash of %s, (%s)', url, str(exc))
-        return jsonify({'status': 'error', 'info': 'year param must be numeric.'})
+        APP._logger.warning('Cannot get simhash of %s, (%s)', url, str(exc))
+        return jsonify({'status': 'error',
+                        'info': 'year param must be numeric.'})
     except AssertionError as exc:
-        APP._logger.error('Invalid %s, (%s)', url, str(exc))
+        APP._logger.warning('Invalid %s, (%s)', url, str(exc))
         return jsonify({'status': 'error', 'info': 'invalid url format.'})
 
 
@@ -107,11 +108,13 @@ def request_url():
     try:
         url = request.args.get('url')
         if not url:
-            return jsonify({'status': 'error', 'info': 'url param is required.'})
+            return jsonify({'status': 'error',
+                            'info': 'url param is required.'})
         assert url_is_valid(url)
         year = request.args.get('year')
         if not year:
-            return jsonify({'status': 'error', 'info': 'year param is required.'})
+            return jsonify({'status': 'error',
+                            'info': 'year param is required.'})
         # validate that year is integer
         int(year)
         # see if there is an active job for this request
@@ -121,16 +124,18 @@ def request_url():
         res = APP.celery.tasks['Discover'].apply_async(args=[url, year])
         return jsonify({'status': 'started', 'job_id': res.id})
     except CeleryError as exc:
-        APP._logger.error('Cannot calculate simhash of %s, %s (%s)', url, year,
-                          str(exc))
-        return jsonify({'status': 'error', 'info': 'Cannot start calculation.'})
+        APP._logger.warning('Cannot calculate simhash of %s, %s (%s)', url,
+                            year, str(exc))
+        return jsonify({'status': 'error',
+                        'info': 'Cannot start calculation.'})
     except ValueError as exc:
-        APP._logger.error('Cannot calculate simhash of %s, no year (%s)',
-                          url, str(exc))
-        return jsonify({'status': 'error', 'info': 'year param must be numeric.'})
+        APP._logger.warning('Cannot calculate simhash of %s, no year (%s)',
+                            url, str(exc))
+        return jsonify({'status': 'error',
+                        'info': 'year param must be numeric.'})
     except AssertionError as exc:
-        APP._logger.error('Cannot calculate simhash of %s, invalid url (%s)',
-                          url, str(exc))
+        APP._logger.warning('Cannot calculate simhash of %s, invalid url (%s)',
+                            url, str(exc))
         return jsonify({'status': 'error', 'info': 'invalid url format.'})
 
 

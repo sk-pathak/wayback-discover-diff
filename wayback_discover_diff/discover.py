@@ -78,6 +78,10 @@ class Discover(Task):
     """
     name = 'Discover'
     task_id = None
+    # If a simhash calculation for a URL & year does more than
+    # `max_download_errors`, stop it to avoid pointless requests. There is
+    # probably a problem with these captures.
+    max_download_errors = 10
 
     def __init__(self, cfg):
         self.simhash_size = cfg['simhash']['size']
@@ -101,6 +105,7 @@ class Discover(Task):
             )
         self.tpool = ThreadPoolExecutor(max_workers=cfg['threads'])
         self.snapshots_number = cfg['snapshots']['number_per_year']
+        self.download_errors = 0
         # Initialize logger
         self._log = logging.getLogger('wayback_discover_diff.worker')
 
@@ -113,8 +118,9 @@ class Discover(Task):
             resp = self.http.request('GET', '/web/%sid_/%s' % (ts, self.url))
             return resp.data.decode('utf-8', 'ignore')
         except HTTPError as exc:
-            self._log.error('cannot fetch capture %s %s (%s)', ts, self.url,
-                            str(exc))
+            self.download_errors += 1
+            self._log.warning('cannot fetch capture %s %s (%s)', ts, self.url,
+                              str(exc))
             return None
 
     def start_profiling(self, snapshot, index):
@@ -126,11 +132,16 @@ class Discover(Task):
         """if a capture with an equal digest has been already processed,
         return cached simhash and avoid redownloading and processing. Else,
         download capture, extract HTML features and calculate simhash.
+        If there are already too many download failures, return None without
+        any processing to avoid pointless requests.
         Return None if any problem occurs (e.g. HTTP error or cannot calculate)
         """
         if digest in self.seen:
             self._log.info("already seen %s %s" % (digest, self.seen[digest]))
             return self.seen[digest]
+
+        if self.download_errors >= self.max_download_errors:
+            return None
 
         response_data = self.download_capture(timestamp)
         if response_data:
@@ -146,7 +157,8 @@ class Discover(Task):
         self.job_id = self.request.id
         self.url = url_fix(url)
         time_started = datetime.now()
-        self._log.info('calculate simhash started')
+        self._log.info('Start calculating simhashes.')
+        self.download_errors = 0
         if not self.url:
             self._log.error('did not give url parameter')
             return {'status': 'error', 'info': 'URL is required.'}
@@ -204,26 +216,25 @@ class Discover(Task):
                 if cap[1] not in self.seen:
                     self.seen[cap[1]] = simhash
                 # This encoding is necessary to store simhash data in Redis.
-                final_results[cap[0]] = base64.b64encode(pack_simhash_to_bytes(simhash, self.simhash_size))
+                final_results[cap[0]] = base64.b64encode(
+                    pack_simhash_to_bytes(simhash, self.simhash_size)
+                    )
             if i % 10 == 0:
                 self.update_state(
                     task_id=self.job_id, state='PENDING',
-                    meta={'info': '%d out of %d captures have been processed.' % (i, total)}
+                    meta={'info': 'Processed %d out of %d captures.' % (i, total)}
                 )
             i += 1
-        self._log.info('Final results for %s and year %s are %d', self.url,
-                       year, len(final_results))
+        self._log.info('%d final results for %s and year %s.',
+                       len(final_results), self.url, year)
         if final_results:
-            # write results to Redis
             try:
-                self._log.info('saving to key %s', urlkey)
                 self.redis_db.hmset(urlkey, final_results)
                 self.redis_db.expire(urlkey, self.simhash_expire)
             except RedisError as exc:
                 self._log.error('cannot write simhashes to Redis for URL %s (%s)',
                                 self.url, str(exc))
 
-        time_ended = datetime.now()
-        self._log.info('calculate simhash ended with duration: %d',
-                       (time_ended - time_started).seconds)
-        return {'duration': str((time_ended - time_started).seconds)}
+        duration = (datetime.now() - time_started).seconds
+        self._log.info('Simhash calculation finished in %.2fsec.', duration)
+        return {'duration': str(duration)}

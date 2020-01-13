@@ -110,8 +110,7 @@ class Discover(Task):
         """
         try:
             self._log.info('fetching capture %s %s', ts, self.url)
-            resp = self.http.request('GET', '/web/%sid_/%s' % (
-                                     ts, url_fix(self.url)))
+            resp = self.http.request('GET', '/web/%sid_/%s' % (ts, self.url))
             return resp.data.decode('utf-8', 'ignore')
         except HTTPError as exc:
             self._log.error('cannot fetch capture %s %s (%s)', ts, self.url,
@@ -145,7 +144,7 @@ class Discover(Task):
         """Run Celery Task.
         """
         self.job_id = self.request.id
-        self.url = url
+        self.url = url_fix(url)
         time_started = datetime.now()
         self._log.info('calculate simhash started')
         if not self.url:
@@ -169,8 +168,7 @@ class Discover(Task):
                       'collapse': 'timestamp:9'}
             if self.snapshots_number != -1:
                 fields['limit'] = self.snapshots_number
-            response = self.http.request('GET', '/cdx/search/cdx',
-                                         fields=fields)
+            response = self.http.request('GET', '/web/timemap', fields=fields)
             self._log.info('finished fetching timestamps of %s for year %s',
                            self.url, year)
             assert response.status == 200

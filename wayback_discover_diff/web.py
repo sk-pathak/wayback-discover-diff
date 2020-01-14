@@ -53,23 +53,26 @@ def simhash():
     try:
         url = request.args.get('url')
         if not url:
-            return jsonify({'status': 'error', 'info': 'url param is required.'})
+            return jsonify({'status': 'error',
+                            'info': 'url param is required.'})
         assert url_is_valid(url)
-
         timestamp = request.args.get('timestamp')
         if not timestamp:
             year = request.args.get('year')
             if not year:
-                return jsonify({'status': 'error', 'info': 'year param is required.'})
+                return jsonify({'status': 'error',
+                                'info': 'year param is required.'})
             # validate that year is integer
             int(year)
             page = request.args.get('page', type=int)
             if page and page <= 0:
-                return jsonify({'status': 'error', 'info': 'pager param should be > 0.'})
+                return jsonify({'status': 'error',
+                                'info': 'pager param should be > 0.'})
 
             snapshots = APP.config.get('snapshots')
             snapshots_per_page = snapshots.get('number_per_page')
-            results_tuple = year_simhash(APP.redis_db, url, year, page, snapshots_per_page)
+            results_tuple = year_simhash(APP.redis_db, url, year, page,
+                                         snapshots_per_page)
             # check if year_simhash produced an error response and return it
             if isinstance(results_tuple, dict):
                 return jsonify(results_tuple)
@@ -83,15 +86,15 @@ def simhash():
                 output['captures'] = captures
                 output['hashes'] = hashes
             return jsonify(output)
-        else:
-            results = timestamp_simhash(APP.redis_db, url, timestamp)
-            # check if timestamp_simhash produced an error response and return it
-            if isinstance(results, dict):
-                return jsonify(results)
-            task = get_active_task(url, timestamp[:4])
-            if task:
-                return jsonify({'status': 'PENDING', 'captures': results})
-            return jsonify({'status': 'COMPLETE', 'captures': results})
+
+        results = timestamp_simhash(APP.redis_db, url, timestamp)
+        # check if timestamp_simhash produced an error response and return it
+        if isinstance(results, dict):
+            return jsonify(results)
+        task = get_active_task(url, timestamp[:4])
+        if task:
+            return jsonify({'status': 'PENDING', 'captures': results})
+        return jsonify({'status': 'COMPLETE', 'captures': results})
     except ValueError as exc:
         APP._logger.warning('Cannot get simhash of %s, (%s)', url, str(exc))
         return jsonify({'status': 'error',
@@ -103,7 +106,8 @@ def simhash():
 
 @APP.route('/calculate-simhash')
 def request_url():
-    """Validate parameters url & timestamp before starting Celery task.
+    """Start simhash calculation for URL & year.
+    Validate parameters url & timestamp before starting Celery task.
     """
     try:
         url = request.args.get('url')
@@ -141,10 +145,13 @@ def request_url():
 
 @APP.route('/job')
 def job_status():
+    """Return job status.
+    """
     try:
         job_id = request.args.get('job_id')
         if not job_id:
-            return jsonify({'status': 'error', 'info': 'job_id param is required.'})
+            return jsonify({'status': 'error',
+                            'info': 'job_id param is required.'})
         task = AsyncResult(job_id, app=APP.celery)
         if task.state == states.PENDING:
             if task.info:

@@ -2,7 +2,7 @@
 import mock
 from test_util import StubRedis
 from wayback_discover_diff.discover import (extract_html_features,
-    calculate_simhash, pack_simhash_to_bytes, Discover)
+    calculate_simhash, custom_hash_function, pack_simhash_to_bytes, Discover)
 
 
 def test_extract_html_features():
@@ -159,5 +159,40 @@ def test_shortened_hash():
     }
     h = calculate_simhash(features, h_size)
     assert h.bit_length() != h_size
+    h_bytes = pack_simhash_to_bytes(h, h_size)
+    assert len(h_bytes) == h_size // 8
+
+
+def test_simhash_256():
+    h_size = 256
+    features = {
+        '2019': 1,
+        'advanced': 1,
+        'at': 1,
+        'google': 1,
+        'googleadvertising': 1,
+        'google©': 1,
+        'history': 1,
+        'insearch': 1,
+        'library': 1,
+        'local': 1,
+        'more': 1,
+        'new': 1,
+        'optionssign': 1,
+        'privacy': 1,
+        'programsbusiness': 1,
+        'searchimagesmapsplayyoutubenewsgmaildrivemorecalendartranslatemobilebooksshoppingbloggerfinancephotosvideosdocseven': 1,
+        'searchlanguage': 1,
+        'settingsweb': 1,
+        'skills': 1,
+        'solutionsabout': 1,
+        'terms': 1,
+        'toolsdevelop': 1,
+        'with': 1,
+        'your': 1,
+        '»account': 1,
+    }
+    h = calculate_simhash(features, h_size, custom_hash_function)
+    assert h.bit_length() == h_size
     h_bytes = pack_simhash_to_bytes(h, h_size)
     assert len(h_bytes) == h_size // 8

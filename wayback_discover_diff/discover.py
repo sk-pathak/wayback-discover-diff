@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import hashlib
 import logging
 import string
 from datetime import datetime
@@ -56,11 +57,15 @@ def extract_html_features(html):
 #     return int(xxhash.xxh64(x).hexdigest(), 16)
 
 
-def calculate_simhash(features_dict, simhash_size):
+def custom_hash_function(x):
+    return int.from_bytes(hashlib.blake2b(x).digest(), byteorder='big')
+
+
+def calculate_simhash(features_dict, simhash_size, hashfunc=None):
     """Calculate simhash for features in a dict. `features_dict` contains data
     like {'text': weight}
     """
-    return Simhash(features_dict, simhash_size).value
+    return Simhash(features_dict, simhash_size, hashfunc=hashfunc).value
 
 
 def pack_simhash_to_bytes(simhash, simhash_size=None):
@@ -86,6 +91,8 @@ class Discover(Task):
     def __init__(self, cfg):
         self.simhash_size = cfg['simhash']['size']
         self.simhash_expire = cfg['simhash']['expire_after']
+        if self.simhash_size > 512:
+            raise Exception('do not support simhash longer than 512')
 
         headers = {'User-Agent': 'wayback-discover-diff',
                    'Accept-Encoding': 'gzip,deflate',
@@ -148,7 +155,7 @@ class Discover(Task):
             data = extract_html_features(response_data)
             if data:
                 self._log.info("calculating simhash")
-                return calculate_simhash(data, self.simhash_size)
+                return calculate_simhash(data, self.simhash_size, hashfunc=custom_hash_function)
         return None
 
     def run(self, url, year):

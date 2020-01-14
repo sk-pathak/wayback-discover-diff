@@ -1,8 +1,15 @@
+import sys
 from setuptools import setup, find_packages
+
+
+if sys.version_info < (3, 6):
+    raise RuntimeError("Python version is {}. Requires 3.6 or greater."
+                       "".format(sys.version_info))
+
 
 setup(
     name='wayback-discover-diff',
-    version='0.1.6.16',
+    version='0.1.7.0',
     description='Calculate wayback machine captures simhash',
     packages=find_packages(),
     zip_safe=False,

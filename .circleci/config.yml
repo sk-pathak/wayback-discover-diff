@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: ~/wayback-discover-diff
     docker:
-      - image: circleci/python:3.5
+      - image: circleci/python:3.6
     steps:
       - checkout
 
@@ -12,10 +12,6 @@ jobs:
           command: |
             python -m venv venv
             . venv/bin/activate
-            # Even though Flask is included in setup.py, I get error:
-            # error: The 'Flask' distribution was not found and is required by wayback-discover-diff
-            # This fixes that.
-            pip install Flask
             python setup.py develop
             # Even though pytest, mock & pylint are defined in setup.py, they
             # are not installed. This fixes that.

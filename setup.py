@@ -9,22 +9,22 @@ if sys.version_info < (3, 6):
 
 setup(
     name='wayback-discover-diff',
-    version='0.1.7.0',
+    version='0.1.7.1',
     description='Calculate wayback machine captures simhash',
     packages=find_packages(),
     zip_safe=False,
     install_requires=[
-        'Flask>=1.1.1',
+        'Flask>=1.1.2',
         'simhash',
         'urllib3>=1.25.6',
         'PyYAML>=5.1',
-        # required for Celery 4.4.0
-        'celery[redis]==4.4.0',
-        'kombu>=4.6.7,<4.7',
-        'redis>=3.3.0',
+        # required for Celery
+        'celery[redis]==4.4.6',
+        'kombu==4.6.11',
+        'redis>=3.4.1',
 
         'lxml',
-        'beautifulsoup4>=4.8.2',
+        'beautifulsoup4>=4.9.1',
         'flask-cors',
         'surt'
         ],

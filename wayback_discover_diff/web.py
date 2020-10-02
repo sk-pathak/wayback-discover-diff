@@ -53,22 +53,18 @@ def simhash():
     try:
         url = request.args.get('url')
         if not url:
-            return jsonify({'status': 'error',
-                            'info': 'url param is required.'})
+            return {'status': 'error', 'info': 'url param is required.'}
         assert url_is_valid(url)
         timestamp = request.args.get('timestamp')
         if not timestamp:
             year = request.args.get('year')
             if not year:
-                return jsonify({'status': 'error',
-                                'info': 'year param is required.'})
+                return {'status': 'error', 'info': 'year param is required.'}
             # validate that year is integer
             int(year)
             page = request.args.get('page', type=int)
             if page and page <= 0:
-                return jsonify({'status': 'error',
-                                'info': 'pager param should be > 0.'})
-
+                return {'status': 'error', 'info': 'pager param should be > 0.'}
             snapshots = APP.config.get('snapshots')
             snapshots_per_page = snapshots.get('number_per_page')
             results_tuple = year_simhash(APP.redis_db, url, year, page,
@@ -85,23 +81,22 @@ def simhash():
                 (captures, hashes) = compress_captures(output['captures'])
                 output['captures'] = captures
                 output['hashes'] = hashes
-            return jsonify(output)
+            return output
 
         results = timestamp_simhash(APP.redis_db, url, timestamp)
         # check if timestamp_simhash produced an error response and return it
         if isinstance(results, dict):
-            return jsonify(results)
+            return results
         task = get_active_task(url, timestamp[:4])
         if task:
-            return jsonify({'status': 'PENDING', 'captures': results})
-        return jsonify({'status': 'COMPLETE', 'captures': results})
+            return {'status': 'PENDING', 'captures': results}
+        return {'status': 'COMPLETE', 'captures': results}
     except ValueError as exc:
         APP._logger.warning('Cannot get simhash of %s, (%s)', url, str(exc))
-        return jsonify({'status': 'error',
-                        'info': 'year param must be numeric.'})
+        return {'status': 'error', 'info': 'year param must be numeric.'}
     except AssertionError as exc:
         APP._logger.warning('Invalid %s, (%s)', url, str(exc))
-        return jsonify({'status': 'error', 'info': 'invalid url format.'})
+        return {'status': 'error', 'info': 'invalid url format.'}
 
 
 @APP.route('/calculate-simhash')
@@ -112,35 +107,31 @@ def request_url():
     try:
         url = request.args.get('url')
         if not url:
-            return jsonify({'status': 'error',
-                            'info': 'url param is required.'})
+            return {'status': 'error', 'info': 'url param is required.'}
         assert url_is_valid(url)
         year = request.args.get('year')
         if not year:
-            return jsonify({'status': 'error',
-                            'info': 'year param is required.'})
+            return {'status': 'error', 'info': 'year param is required.'}
         # validate that year is integer
         int(year)
         # see if there is an active job for this request
         task = get_active_task(url, year)
         if task:
-            return jsonify({'status': 'PENDING', 'job_id': task['id']})
+            return {'status': 'PENDING', 'job_id': task['id']}
         res = APP.celery.tasks['Discover'].apply_async(args=[url, year])
-        return jsonify({'status': 'started', 'job_id': res.id})
+        return {'status': 'started', 'job_id': res.id}
     except CeleryError as exc:
         APP._logger.warning('Cannot calculate simhash of %s, %s (%s)', url,
                             year, str(exc))
-        return jsonify({'status': 'error',
-                        'info': 'Cannot start calculation.'})
+        return {'status': 'error', 'info': 'Cannot start calculation.'}
     except ValueError as exc:
         APP._logger.warning('Cannot calculate simhash of %s, no year (%s)',
                             url, str(exc))
-        return jsonify({'status': 'error',
-                        'info': 'year param must be numeric.'})
+        return {'status': 'error', 'info': 'year param must be numeric.'}
     except AssertionError as exc:
         APP._logger.warning('Cannot calculate simhash of %s, invalid url (%s)',
                             url, str(exc))
-        return jsonify({'status': 'error', 'info': 'invalid url format.'})
+        return {'status': 'error', 'info': 'invalid url format.'}
 
 
 @APP.route('/job')
@@ -150,8 +141,7 @@ def job_status():
     try:
         job_id = request.args.get('job_id')
         if not job_id:
-            return jsonify({'status': 'error',
-                            'info': 'job_id param is required.'})
+            return {'status': 'error', 'info': 'job_id param is required.'}
         task = AsyncResult(job_id, app=APP.celery)
         if task.state == states.PENDING:
             if task.info:
@@ -159,24 +149,17 @@ def job_status():
             else:
                 info = None
             # job did not finish yet
-            response = {'status': task.state,
-                        'job_id': task.id,
-                        'info': info}
+            return {'status': task.state, 'job_id': task.id, 'info': info}
+
+        if task.info and task.info.get('status', 0) == 'error':
+            # something went wrong in the background job
+            return {'info': task.info.get('info', 1), 'job_id': task.id,
+                    'status': task.info.get('status', 0)}
+        if task.info:
+            duration = task.info.get('duration', 1)
         else:
-            if task.info and task.info.get('status', 0) == 'error':
-                # something went wrong in the background job
-                response = {'info': task.info.get('info', 1),
-                            'job_id': task.id,
-                            'status': task.info.get('status', 0)}
-            else:
-                if task.info:
-                    duration = task.info.get('duration', 1)
-                else:
-                    duration = 1
-                response = {'status': task.state,
-                            'job_id': task.id,
-                            'duration': duration}
-        return jsonify(response)
+            duration = 1
+        return {'status': task.state, 'job_id': task.id, 'duration': duration}
     except (CeleryError, AttributeError) as exc:
         APP._logger.error('Cannot get job status of %s, (%s)', job_id, str(exc))
-        return jsonify({'status': 'error', 'info': 'Cannot get status.'})
+        return {'status': 'error', 'info': 'Cannot get status.'}

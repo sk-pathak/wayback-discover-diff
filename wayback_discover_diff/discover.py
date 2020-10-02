@@ -190,15 +190,15 @@ class Discover(Task):
             response = self.http.request('GET', '/web/timemap', fields=fields)
             self._log.info('finished fetching timestamps of %s for year %s',
                            self.url, year)
-            assert response.status == 200
-            if not response.data:
-                self._log.info('no captures found for %s %s', self.url, year)
-                self.redis_db.hset(urlkey, year, -1)
-                self.redis_db.expire(urlkey, self.simhash_expire)
-                return {'status': 'error',
-                        'info': 'no captures found for this year and url combination'}
-            captures_txt = response.data.decode('utf-8')
-        except (AssertionError, ValueError, HTTPError) as exc:
+            if response.status == 200:
+                if not response.data:
+                    self._log.info('no captures found for %s %s', self.url, year)
+                    self.redis_db.hset(urlkey, year, -1)
+                    self.redis_db.expire(urlkey, self.simhash_expire)
+                    return {'status': 'error',
+                            'info': 'no captures found for this year and url combination'}
+                captures_txt = response.data.decode('utf-8')
+        except (ValueError, HTTPError) as exc:
             self._log.error('invalid CDX query response (%s)', exc)
             return {'status': 'error', 'info': str(exc)}
         except RedisError as exc:

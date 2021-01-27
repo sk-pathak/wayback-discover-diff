@@ -9,7 +9,7 @@ if sys.version_info < (3, 6):
 
 setup(
     name='wayback-discover-diff',
-    version='0.1.7.1',
+    version='0.1.7.2',
     description='Calculate wayback machine captures simhash',
     packages=find_packages(),
     zip_safe=False,
@@ -23,9 +23,8 @@ setup(
         'kombu==4.6.11',
         'redis>=3.4.1',
 
-        'lxml',
-        'beautifulsoup4>=4.9.1',
         'flask-cors',
+        'selectolax',
         'surt'
         ],
     tests_require=[

@@ -13,7 +13,7 @@ from redis import StrictRedis, BlockingConnectionPool
 from redis.exceptions import RedisError
 from simhash import Simhash
 from surt import surt
-from bs4 import BeautifulSoup
+from selectolax.parser import HTMLParser
 from werkzeug.urls import url_fix
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
@@ -33,18 +33,19 @@ def extract_html_features(html):
     drop blank lines
     return a dict with features and their weights
     """
-    soup = BeautifulSoup(html, features='lxml')
-    for script in soup(["script", "style"]):
-        script.decompose()
-    text = soup.get_text().lower()
-    text = text.translate(TRANSLATOR)
+    try:
+        tree = HTMLParser(html)
+        tree.strip_tags(['script', 'style'])
+        text = tree.root.text(separator=' ')
+        if not text:
+            return {}
+    except UnicodeDecodeError:
+        return {}
+    text = text.lower().translate(TRANSLATOR)
     lines = (line.strip() for line in text.splitlines())
     chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
     text = '\n'.join(chunk for chunk in chunks if chunk)
-    text = text.split()
-    # this frees up memory https://stackoverflow.com/questions/11284643/python-high-memory-usage-with-beautifulsoup
-    soup.decompose()
-    return {k: sum(1 for _ in g) for k, g in groupby(sorted(text))}
+    return {k: sum(1 for _ in g) for k, g in groupby(sorted(text.split()))}
 
 # This custom hash function generated ALWAYS the same simhash size despite
 # changing simhash size setting. Using the default, we get the right simhashes.

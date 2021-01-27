@@ -71,6 +71,15 @@ abc
     assert extract_html_features(html) == features
 
 
+    html = """<Html>
+    <something>weird is happening \c\x0b
+    <span>tag</span><span>tag</span>
+    </HTML>"""
+
+    features = {'c': 1, 'weird': 1, 'is': 1, 'happening': 1, 'tag': 2}
+    assert extract_html_features(html) == features
+
+
 def test_calculate_simhash():
     features = {'two': 2, 'three': 3, 'one': 1}
     assert calculate_simhash(features, 128) == 66237222457941138286276456718971054176

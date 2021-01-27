@@ -3,7 +3,7 @@ import pkg_resources
 from celery import states
 from celery.result import AsyncResult
 from celery.exceptions import CeleryError
-from flask import (Flask, request, jsonify)
+from flask import Flask, request
 from redis.exceptions import RedisError
 from .util import (year_simhash, timestamp_simhash, url_is_valid,
                    compress_captures)
@@ -54,24 +54,22 @@ def simhash():
         url = request.args.get('url')
         if not url:
             return {'status': 'error', 'info': 'url param is required.'}
-        assert url_is_valid(url)
+        if not url_is_valid(url):
+            return {'status': 'error', 'info': 'invalid url format.'}
         timestamp = request.args.get('timestamp')
         if not timestamp:
-            year = request.args.get('year')
+            year = request.args.get('year', type=int)
             if not year:
                 return {'status': 'error', 'info': 'year param is required.'}
-            # validate that year is integer
-            int(year)
             page = request.args.get('page', type=int)
             if page and page <= 0:
                 return {'status': 'error', 'info': 'pager param should be > 0.'}
-            snapshots = APP.config.get('snapshots')
-            snapshots_per_page = snapshots.get('number_per_page')
+            snapshots_per_page = APP.config.get('snapshots', {}).get('number_per_page')
             results_tuple = year_simhash(APP.redis_db, url, year, page,
                                          snapshots_per_page)
             # check if year_simhash produced an error response and return it
             if isinstance(results_tuple, dict):
-                return jsonify(results_tuple)
+                return results_tuple
             task = get_active_task(url, year)
 
             output = dict(captures=results_tuple[0],
@@ -94,9 +92,6 @@ def simhash():
     except ValueError as exc:
         APP._logger.warning('Cannot get simhash of %s, (%s)', url, str(exc))
         return {'status': 'error', 'info': 'year param must be numeric.'}
-    except AssertionError as exc:
-        APP._logger.warning('Invalid %s, (%s)', url, str(exc))
-        return {'status': 'error', 'info': 'invalid url format.'}
 
 
 @APP.route('/calculate-simhash')
@@ -108,12 +103,11 @@ def request_url():
         url = request.args.get('url')
         if not url:
             return {'status': 'error', 'info': 'url param is required.'}
-        assert url_is_valid(url)
-        year = request.args.get('year')
+        if not url_is_valid(url):
+            return {'status': 'error', 'info': 'invalid url format.'}
+        year = request.args.get('year', type=int)
         if not year:
             return {'status': 'error', 'info': 'year param is required.'}
-        # validate that year is integer
-        int(year)
         # see if there is an active job for this request
         task = get_active_task(url, year)
         if task:
@@ -128,10 +122,6 @@ def request_url():
         APP._logger.warning('Cannot calculate simhash of %s, no year (%s)',
                             url, str(exc))
         return {'status': 'error', 'info': 'year param must be numeric.'}
-    except AssertionError as exc:
-        APP._logger.warning('Cannot calculate simhash of %s, invalid url (%s)',
-                            url, str(exc))
-        return {'status': 'error', 'info': 'invalid url format.'}
 
 
 @APP.route('/job')

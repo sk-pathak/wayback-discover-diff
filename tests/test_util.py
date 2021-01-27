@@ -61,7 +61,8 @@ class StubRedis(dict):
     ('other', False),
     ('torrent:something.gr/file', False),
     ('tel:00302310123456', False),
-    ('loudfi1@libero.it', False)
+    ('loudfi1@libero.it', False),
+    ('http://roblox', False)
     ])
 def test_url_is_valid(url, result):
     assert url_is_valid(url) == result

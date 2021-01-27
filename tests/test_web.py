@@ -72,7 +72,7 @@ def test_simhash_task_parameters():
     resp = client.get('/calculate-simhash?url=example.com&year=XY')
     assert resp.status_code == 200
     data = json.loads(resp.data.decode('utf-8'))
-    assert data == dict(status='error', info='year param must be numeric.')
+    assert data == dict(status='error', info='year param is required.')
 
     resp = client.get('/calculate-simhash?url=nonexistingdomain.org')
     assert resp.status_code == 200
@@ -82,7 +82,7 @@ def test_simhash_task_parameters():
     resp = client.get('/calculate-simhash?url=nonexistingdomain.org&year=-')
     assert resp.status_code == 200
     data = json.loads(resp.data.decode('utf-8'))
-    assert data == dict(status='error', info='year param must be numeric.')
+    assert data == dict(status='error', info='year param is required.')
 
     resp = client.get('/calculate-simhash?url=foo&year=2000')
     assert resp.status_code == 200

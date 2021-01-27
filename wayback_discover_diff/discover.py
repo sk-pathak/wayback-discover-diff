@@ -100,7 +100,7 @@ class Discover(Task):
                    'Connection': 'keep-alive'}
         cdx_auth_token = cfg.get('cdx_auth_token')
         if cdx_auth_token:
-            headers = dict(cookie='cdx_auth_token=%s' % cdx_auth_token)
+            headers['cookie'] = 'cdx_auth_token=%s' % cdx_auth_token
 
         self.http = urllib3.HTTPConnectionPool('web.archive.org', maxsize=50,
                                                retries=4, headers=headers)
@@ -129,7 +129,7 @@ class Discover(Task):
             self.download_errors += 1
             self._log.warning('cannot fetch capture %s %s (%s)', ts, self.url,
                               str(exc))
-            return None
+        return None
 
     def start_profiling(self, snapshot, index):
         cProfile.runctx('self.get_calc(snapshot, index)',

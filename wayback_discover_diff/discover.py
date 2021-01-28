@@ -85,9 +85,10 @@ class Discover(Task):
     name = 'Discover'
     task_id = None
     # If a simhash calculation for a URL & year does more than
-    # `max_download_errors`, stop it to avoid pointless requests. There is
-    # probably a problem with these captures.
+    # `max_download_errors`, stop it to avoid pointless requests. The captures
+    # are not text/html or there is a problem with the WBM.
     max_download_errors = 10
+    max_capture_download = 1000000
 
     def __init__(self, cfg):
         self.simhash_size = cfg['simhash']['size']
@@ -118,17 +119,27 @@ class Discover(Task):
         self._log = logging.getLogger('wayback_discover_diff.worker')
 
     def download_capture(self, ts):
-        """Download capture from WBM and update job status.
-        Return capture body (probably HTML text)
+        """Download capture data from the WBM and update job status. Return
+        data only when its text or html. If not, increment download_errors
+        which will stop the task after 10 errors. Fetch data up to a limit
+        to avoid getting too much (which is unnecessary) and have a consistent
+        operation time.
         """
         try:
             self._log.info('fetching capture %s %s', ts, self.url)
-            resp = self.http.request('GET', '/web/%sid_/%s' % (ts, self.url))
-            return resp.data.decode('utf-8', 'ignore')
+            res = self.http.request('GET', '/web/%sid_/%s' % (ts, self.url),
+                                    preload_content=False)
+            data = res.read(self.max_capture_download)
+            ctype = res.headers.get('content-type')
+            res.release_conn()
+            if ctype:
+                ctype = ctype.lower()
+                if "text" in ctype or "html" in ctype:
+                    return data
         except HTTPError as exc:
-            self.download_errors += 1
             self._log.warning('cannot fetch capture %s %s (%s)', ts, self.url,
                               str(exc))
+        self.download_errors += 1
         return None
 
     def start_profiling(self, snapshot, index):
@@ -149,6 +160,7 @@ class Discover(Task):
             return self.seen[digest]
 
         if self.download_errors >= self.max_download_errors:
+            self._log.error('Too many download errors, exiting')
             return None
 
         response_data = self.download_capture(timestamp)
@@ -212,6 +224,10 @@ class Discover(Task):
         futures_to_url = {}
         # calculate simhashes in parallel
         for cap in captures:
+            if self.download_errors >= self.max_download_errors:
+                self._log.error('Too many download errors, exiting, %s %s',
+                                url, year)
+                return None
             (ts, digest) = cap.split(' ')
             future = self.tpool.submit(self.get_calc, ts, digest)
             futures_to_url[future] = (ts, digest)

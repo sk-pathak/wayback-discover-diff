@@ -18,6 +18,10 @@ celery:
     task_soft_time_limit: 7200
     worker_max_tasks_per_child: 100
 
+statsd:
+    host: "graphite.us.archive.org"
+    port: 8125
+
 threads: 8
 
 snapshots:

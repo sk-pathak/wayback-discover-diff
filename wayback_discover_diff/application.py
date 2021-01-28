@@ -5,6 +5,7 @@ import os
 from celery import Celery
 from flask_cors import CORS
 from redis import StrictRedis, BlockingConnectionPool
+from wayback_discover_diff import stats
 from wayback_discover_diff.util import load_config
 from wayback_discover_diff.discover import Discover
 
@@ -15,6 +16,11 @@ CFG = load_config()
 logconf = CFG.get('logging')
 if logconf:
     logging.config.dictConfig(logconf)
+
+# Init statsd client
+stats_conf = CFG.get('statsd')
+if isinstance(stats_conf, dict):
+    stats.configure(**stats_conf)
 
 # Init Celery app
 CELERY = Celery(config_source=CFG['celery'])

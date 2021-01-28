@@ -16,6 +16,8 @@ from surt import surt
 from selectolax.parser import HTMLParser
 from werkzeug.urls import url_fix
 
+from .stats import statsd_incr
+
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
 
@@ -126,6 +128,7 @@ class Discover(Task):
         operation time.
         """
         try:
+            statsd_incr('download-capture')
             self._log.info('fetching capture %s %s', ts, self.url)
             res = self.http.request('GET', '/web/%sid_/%s' % (ts, self.url),
                                     preload_content=False)
@@ -167,6 +170,7 @@ class Discover(Task):
         if response_data:
             data = extract_html_features(response_data)
             if data:
+                statsd_incr('calculate-simhash')
                 self._log.info("calculating simhash")
                 return calculate_simhash(data, self.simhash_size, hashfunc=custom_hash_function)
         return None

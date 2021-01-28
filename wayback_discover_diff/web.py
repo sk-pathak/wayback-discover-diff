@@ -5,6 +5,7 @@ from celery.result import AsyncResult
 from celery.exceptions import CeleryError
 from flask import Flask, request
 from redis.exceptions import RedisError
+from .stats import statsd_incr
 from .util import (year_simhash, timestamp_simhash, url_is_valid,
                    compress_captures)
 
@@ -51,6 +52,7 @@ def simhash():
     page is also optional.
     """
     try:
+        statsd_incr('get-simhash-year-request')
         url = request.args.get('url')
         if not url:
             return {'status': 'error', 'info': 'url param is required.'}
@@ -98,6 +100,7 @@ def request_url():
     Validate parameters url & timestamp before starting Celery task.
     """
     try:
+        statsd_incr('calculate-simhash-year-request')
         url = request.args.get('url')
         if not url:
             return {'status': 'error', 'info': 'url param is required.'}
@@ -127,6 +130,7 @@ def job_status():
     """Return job status.
     """
     try:
+        statsd_incr('status-request')
         job_id = request.args.get('job_id')
         if not job_id:
             return {'status': 'error', 'info': 'job_id param is required.'}

@@ -62,8 +62,6 @@ def simhash():
             if not year:
                 return {'status': 'error', 'info': 'year param is required.'}
             page = request.args.get('page', type=int)
-            if not page:
-                return {'status': 'error', 'info': 'page param must be > 0.'}
             snapshots_per_page = APP.config.get('snapshots', {}).get('number_per_page')
             results_tuple = year_simhash(APP.redis_db, url, year, page,
                                          snapshots_per_page)

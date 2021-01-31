@@ -1,5 +1,6 @@
 import logging
 import pkg_resources
+from time import time
 from celery import states
 from celery.result import AsyncResult
 from celery.exceptions import CeleryError
@@ -113,7 +114,10 @@ def request_url():
         task = get_active_task(url, year)
         if task:
             return {'status': 'PENDING', 'job_id': task['id']}
-        res = APP.celery.tasks['Discover'].apply_async(args=[url, year])
+        res = APP.celery.tasks['Discover'].apply_async(
+            args=[url, year],
+            kwargs=dict(created=time())
+            )
         return {'status': 'started', 'job_id': res.id}
     except CeleryError as exc:
         APP._logger.warning('Cannot calculate simhash of %s, %s (%s)', url,

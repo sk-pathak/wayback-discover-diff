@@ -175,7 +175,7 @@ class Discover(Task):
                 return calculate_simhash(data, self.simhash_size, hashfunc=custom_hash_function)
         return None
 
-    def run(self, url, year):
+    def run(self, url, year, created):
         """Run Celery Task.
         """
         self.job_id = self.request.id

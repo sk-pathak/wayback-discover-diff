@@ -49,16 +49,6 @@ def extract_html_features(html):
     text = '\n'.join(chunk for chunk in chunks if chunk)
     return {k: sum(1 for _ in g) for k, g in groupby(sorted(text.split()))}
 
-# This custom hash function generated ALWAYS the same simhash size despite
-# changing simhash size setting. Using the default, we get the right simhashes.
-#
-# import xxhash
-#
-# def hash_function(x):
-#     """Custom FAST hash function used to generate simhash.
-#     """
-#     return int(xxhash.xxh64(x).hexdigest(), 16)
-
 
 def custom_hash_function(x):
     return int.from_bytes(hashlib.blake2b(x).digest(), byteorder='big')
@@ -68,7 +58,9 @@ def calculate_simhash(features_dict, simhash_size, hashfunc=None):
     """Calculate simhash for features in a dict. `features_dict` contains data
     like {'text': weight}
     """
-    return Simhash(features_dict, simhash_size, hashfunc=hashfunc).value
+    if hashfunc:
+        return Simhash(features_dict, simhash_size, hashfunc=hashfunc).value
+    return Simhash(features_dict, simhash_size).value
 
 
 def pack_simhash_to_bytes(simhash, simhash_size=None):

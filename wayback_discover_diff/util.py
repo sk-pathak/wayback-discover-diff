@@ -40,10 +40,10 @@ def timestamp_simhash(redis, url, timestamp):
             results = redis.hget(surt(url), timestamp[:4])
             if results:
                 return {'status': 'error', 'message': 'NO_CAPTURES'}
-            return {'status': 'error', 'message': 'CAPTURE_NOT_FOUND'}
     except RedisError as exc:
         logging.error('error loading simhash data for url %s timestamp %s (%s)',
                       url, timestamp, exc)
+    return {'status': 'error', 'message': 'CAPTURE_NOT_FOUND'}
 
 
 def year_simhash(redis, url, year, page=None, snapshots_per_page=None):
@@ -51,6 +51,7 @@ def year_simhash(redis, url, year, page=None, snapshots_per_page=None):
     """
     try:
         if url and year:
+            # TODO replace hkeys with hscan
             results = redis.hkeys(surt(url))
             if results:
                 timestamps_to_fetch = []
@@ -63,10 +64,10 @@ def year_simhash(redis, url, year, page=None, snapshots_per_page=None):
                     return handle_results(redis, timestamps_to_fetch, url,
                                           snapshots_per_page, page)
             # TODO return empty result and NOT error.
-            return {'status': 'error', 'message': 'NOT_CAPTURED'}
     except RedisError as exc:
         logging.error('error loading simhash data for url %s year %s page %d (%s)',
                       url, year, page, exc)
+    return {'status': 'error', 'message': 'NOT_CAPTURED'}
 
 
 def handle_results(redis, timestamps_to_fetch, url, snapshots_per_page,
@@ -84,6 +85,7 @@ def handle_results(redis, timestamps_to_fetch, url, snapshots_per_page,
             number_of_pages = 1
     try:
         results = redis.hmget(surt(url), timestamps_to_fetch)
+        # TODO this crashes because of simhash bytes
         for i, simhash in enumerate(results):
             available_simhashes.append([str(timestamps_to_fetch[i]), simhash])
         if page:
@@ -92,12 +94,15 @@ def handle_results(redis, timestamps_to_fetch, url, snapshots_per_page,
     except RedisError as exc:
         logging.error('cannot handle results for url %s page %d (%s)',
                       url, page, exc)
+    return None
 
 
 EMAIL_RE = re.compile(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
 
 
 def url_is_valid(url):
+    """URL validation.
+    """
     try:
         if not url:
             return False

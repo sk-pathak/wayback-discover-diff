@@ -1,3 +1,5 @@
+"""Celery worker
+"""
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import logging
@@ -51,6 +53,8 @@ def extract_html_features(html):
 
 
 def custom_hash_function(x):
+    """Required by Simhash
+    """
     return int.from_bytes(hashlib.blake2b(x).digest(), byteorder='big')
 
 
@@ -166,7 +170,8 @@ class Discover(Task):
             if data:
                 statsd_incr('calculate-simhash')
                 self._log.info("calculating simhash")
-                return calculate_simhash(data, self.simhash_size, hashfunc=custom_hash_function)
+                return calculate_simhash(data, self.simhash_size,
+                                         hashfunc=custom_hash_function)
         return None
 
     def run(self, url, year, created):

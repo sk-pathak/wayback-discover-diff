@@ -56,6 +56,11 @@ class StubRedis(dict):
         return out
 
 
+@pytest.fixture
+def redis():
+    return StubRedis()
+
+
 @pytest.mark.parametrize('url,result', [
     ('http://example.com/', True),
     ('other', False),
@@ -73,9 +78,8 @@ def test_url_is_valid(url, result):
     ('http://example.com', '2014102', None),
     ('http://other.com', '20141021062411', None),
     ])
-def test_timestamp_simhash(url, timestamp, simhash):
-    redis_db = StubRedis()
-    res = timestamp_simhash(redis_db, url, timestamp)
+def test_timestamp_simhash(url, timestamp, simhash, redis):
+    res = timestamp_simhash(redis, url, timestamp)
     if len(res.keys()) == 1:
         assert res == {'simhash': simhash}
     elif url == 'http://other.com':
@@ -89,12 +93,12 @@ def test_timestamp_simhash(url, timestamp, simhash):
     ('http://example.com', '2016', 1),
     ('http://example.com', '2017', None),
     ('http://example.com', '', None),
-    ('http://other.com', '2014', None),
+    ('http://other.com', '2014', None)
     ])
-def test_year_simhash(url, year, count):
-    redis_db = StubRedis()
-    res = year_simhash(redis_db, url, year)
-    # check if year_simhash produced an error response
+def test_year_simhash(url, year, count, redis):
+    """check if year_simhash produced an error response.
+    """
+    res = year_simhash(redis, url, year)
     if isinstance(res,dict):
         if year == '2014':
             assert res == {'status': 'error', 'message': 'NO_CAPTURES'}

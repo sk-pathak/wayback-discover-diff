@@ -1,6 +1,6 @@
 """Celery worker
 """
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import logging
 import string
@@ -148,7 +148,7 @@ class Discover(Task):
                         globals=globals(), locals=locals(),
                         filename='profile.prof')
 
-    def get_calc(self, timestamp, digest):
+    def get_calc(self, capture):
         """if a capture with an equal digest has been already processed,
         return cached simhash and avoid redownloading and processing. Else,
         download capture, extract HTML features and calculate simhash.
@@ -156,9 +156,11 @@ class Discover(Task):
         any processing to avoid pointless requests.
         Return None if any problem occurs (e.g. HTTP error or cannot calculate)
         """
-        if digest in self.seen:
-            self._log.info("already seen %s %s", digest, self.seen[digest])
-            return self.seen[digest]
+        (timestamp, digest) = capture.split(' ')
+        simhash_enc = self.seen.get(digest)
+        if simhash_enc:
+            self._log.info("already seen %s", digest)
+            return (timestamp, simhash_enc)
 
         if self.download_errors >= self.max_download_errors:
             self._log.error('Too many download errors, exiting')
@@ -170,8 +172,14 @@ class Discover(Task):
             if data:
                 statsd_incr('calculate-simhash')
                 self._log.info("calculating simhash")
-                return calculate_simhash(data, self.simhash_size,
-                                         hashfunc=custom_hash_function)
+                simhash = calculate_simhash(data, self.simhash_size,
+                                            hashfunc=custom_hash_function)
+                # This encoding is necessary to store simhash data in Redis.
+                simhash_enc = base64.b64encode(
+                    pack_simhash_to_bytes(simhash, self.simhash_size)
+                    )
+                self.seen[digest] = simhash_enc
+                return (timestamp, simhash_enc)
         return None
 
     def run(self, url, year, created):
@@ -198,30 +206,22 @@ class Discover(Task):
         captures = resp.get('captures')
         total = len(captures)
         self.seen = dict()
-        futures_to_url = {}
         # calculate simhashes in parallel
-        for cap in captures:
-            (ts, digest) = cap.split(' ')
-            future = self.tpool.submit(self.get_calc, ts, digest)
-            futures_to_url[future] = (ts, digest)
-        final_results = {}
         i = 0
-        for future in as_completed(futures_to_url):
-            cap = futures_to_url[future]
-            simhash = future.result()
+        final_results = {}
+        for res in self.tpool.map(self.get_calc, captures):
+            if not res:
+                continue
+            (timestamp, simhash) = res
             if simhash:
-                if cap[1] not in self.seen:
-                    self.seen[cap[1]] = simhash
-                # This encoding is necessary to store simhash data in Redis.
-                final_results[cap[0]] = base64.b64encode(
-                    pack_simhash_to_bytes(simhash, self.simhash_size)
-                    )
+                final_results[timestamp] = simhash
             if i % 10 == 0:
                 self.update_state(
                     state='PENDING',
                     meta={'info': 'Processed %d out of %d captures.' % (i, total)}
                 )
             i += 1
+
         self._log.info('%d final results for %s and year %s.',
                        len(final_results), self.url, year)
         if final_results:

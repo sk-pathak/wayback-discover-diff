@@ -14,14 +14,14 @@ setup(
     packages=find_packages(),
     zip_safe=False,
     install_requires=[
-        'Flask>=1.1.2',
+        'Flask>=2.0.2',
         'simhash',
         'urllib3>=1.25.6',
-        'PyYAML>=5.1',
+        'PyYAML>=5.3.1,<6',
         # required for Celery
-        'celery[redis]==4.4.6',
-        'kombu==4.6.11',
-        'redis>=3.4.1',
+        'celery==5.2.3',
+        'kombu>=5.2.3,<6.0',
+        'redis==4.1.0',
 
         'flask-cors',
         'selectolax',
@@ -30,7 +30,6 @@ setup(
         ],
     tests_require=[
         'pytest',
-        'mock',
-        'pylint'
+        'mock'
         ],
     )

@@ -37,7 +37,7 @@ if cors:
 
 # Initialize Celery and Redis
 APP.celery = CELERY
-APP.redis_db = StrictRedis(
+APP.redis = StrictRedis(
     connection_pool=BlockingConnectionPool.from_url(
         CFG['redis_uri'], max_connections=50,
         timeout=CFG.get('redis_timeout', 10),

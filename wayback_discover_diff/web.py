@@ -66,7 +66,7 @@ def simhash():
                 return {'status': 'error', 'info': 'year param is required.'}
             page = request.args.get('page', type=int)
             snapshots_per_page = APP.config.get('snapshots', {}).get('number_per_page')
-            results_tuple = year_simhash(APP.redis_db, url, year, page,
+            results_tuple = year_simhash(APP.redis, url, year, page,
                                          snapshots_per_page)
             # check if year_simhash produced an error response and return it
             if isinstance(results_tuple, dict):
@@ -82,7 +82,7 @@ def simhash():
                 output['hashes'] = hashes
             return output
 
-        results = timestamp_simhash(APP.redis_db, url, timestamp)
+        results = timestamp_simhash(APP.redis, url, timestamp)
         # check if timestamp_simhash produced an error response and return it
         if isinstance(results, dict):
             return results

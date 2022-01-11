@@ -99,7 +99,7 @@ class Discover(Task):
 
         self.http = urllib3.HTTPConnectionPool('web.archive.org', maxsize=50,
                                                retries=4, headers=headers)
-        self.redis_db = StrictRedis(
+        self.redis = StrictRedis(
             connection_pool=BlockingConnectionPool.from_url(
                 cfg['redis_uri'], max_connections=50,
                 timeout=cfg.get('redis_timeout', 10),
@@ -138,6 +138,8 @@ class Discover(Task):
         return None
 
     def start_profiling(self, snapshot, index):
+        """Used for performance testing only.
+        """
         cProfile.runctx('self.get_calc(snapshot, index)',
                         globals=globals(), locals=locals(),
                         filename='profile.prof')
@@ -151,7 +153,7 @@ class Discover(Task):
         Return None if any problem occurs (e.g. HTTP error or cannot calculate)
         """
         if digest in self.seen:
-            self._log.info("already seen %s %s" % (digest, self.seen[digest]))
+            self._log.info("already seen %s %s", digest, self.seen[digest])
             return self.seen[digest]
 
         if self.download_errors >= self.max_download_errors:
@@ -181,49 +183,19 @@ class Discover(Task):
         if not year:
             self._log.error('did not give year parameter')
             return {'status': 'error', 'info': 'Year is required.'}
-        urlkey = surt(self.url)
-        try:
-            self._log.info('fetching CDX of %s for year %s', self.url, year)
-            self.update_state(state='PENDING',
-                              meta={'info': 'Fetching %s captures for year %s' % (
-                                    self.url, year)})
-            # Collapse captures by timestamp to get 3 captures per day (max).
-            # TODO increase that in the future when we can handle more captures.
-            # Its necessary to reduce the huge number of captures some websites
-            # (e.g. twitter.com has 167k captures for 2018. Get only 2xx captures.
-            fields = {'url': self.url, 'from': year, 'to': year,
-                      'statuscode': 200, 'fl': 'timestamp,digest',
-                      'collapse': 'timestamp:9'}
-            if self.snapshots_number != -1:
-                fields['limit'] = self.snapshots_number
-            response = self.http.request('GET', '/web/timemap', fields=fields)
-            self._log.info('finished fetching timestamps of %s for year %s',
-                           self.url, year)
-            if response.status == 200:
-                if not response.data:
-                    self._log.info('no captures found for %s %s', self.url, year)
-                    self.redis_db.hset(urlkey, year, -1)
-                    self.redis_db.expire(urlkey, self.simhash_expire)
-                    return {'status': 'error',
-                            'info': 'no captures found for this year and url combination'}
-                captures_txt = response.data.decode('utf-8')
-        except (ValueError, HTTPError) as exc:
-            self._log.error('invalid CDX query response (%s)', exc)
-            return {'status': 'error', 'info': str(exc)}
-        except RedisError as exc:
-            self._log.error('error connecting with Redis for url %s year %s (%s)',
-                            url, year, str(exc))
-            return {'status': 'error', 'info': str(exc)}
-        captures = captures_txt.strip().split("\n")
+        # fetch captures
+        self.update_state(state='PENDING',
+                          meta={'info': 'Fetching %s captures for year %s' % (
+                                url, year)})
+        resp = self.fetch_cdx(url, year)
+        if resp.get('status') == 'error':
+            return resp
+        captures = resp.get('captures')
         total = len(captures)
         self.seen = dict()
         futures_to_url = {}
         # calculate simhashes in parallel
         for cap in captures:
-            if self.download_errors >= self.max_download_errors:
-                self._log.error('Too many download errors, exiting, %s %s',
-                                url, year)
-                return None
             (ts, digest) = cap.split(' ')
             future = self.tpool.submit(self.get_calc, ts, digest)
             futures_to_url[future] = (ts, digest)
@@ -241,7 +213,7 @@ class Discover(Task):
                     )
             if i % 10 == 0:
                 self.update_state(
-                    task_id=self.job_id, state='PENDING',
+                    state='PENDING',
                     meta={'info': 'Processed %d out of %d captures.' % (i, total)}
                 )
             i += 1
@@ -249,8 +221,9 @@ class Discover(Task):
                        len(final_results), self.url, year)
         if final_results:
             try:
-                self.redis_db.hmset(urlkey, final_results)
-                self.redis_db.expire(urlkey, self.simhash_expire)
+                urlkey = surt(self.url)
+                self.redis.hmset(urlkey, final_results)
+                self.redis.expire(urlkey, self.simhash_expire)
             except RedisError as exc:
                 self._log.error('cannot write simhashes to Redis for URL %s (%s)',
                                 self.url, str(exc))
@@ -258,3 +231,42 @@ class Discover(Task):
         duration = (datetime.now() - time_started).seconds
         self._log.info('Simhash calculation finished in %.2fsec.', duration)
         return {'duration': str(duration)}
+
+    def fetch_cdx(self, url, year):
+        """Make a CDX query for timestamp and digest for a specific year.
+        """
+        try:
+            self._log.info('fetching CDX of %s for year %s', url, year)
+            # Collapse captures by timestamp to get 3 captures per day (max).
+            # TODO increase that in the future when we can handle more captures.
+            # Its necessary to reduce the huge number of captures some websites
+            # (e.g. twitter.com has 167k captures for 2018. Get only 2xx captures.
+            fields = {'url': url, 'from': year, 'to': year,
+                      'statuscode': 200, 'fl': 'timestamp,digest',
+                      'collapse': 'timestamp:9'}
+            if self.snapshots_number != -1:
+                fields['limit'] = self.snapshots_number
+            response = self.http.request('GET', '/web/timemap', fields=fields)
+            self._log.info('finished fetching timestamps of %s for year %s',
+                           self, year)
+            if response.status == 200:
+                if not response.data:
+                    self._log.info('no captures found for %s %s', self, year)
+                    urlkey = surt(url)
+                    self.redis.hset(urlkey, year, -1)
+                    self.redis.expire(urlkey, self.simhash_expire)
+                    return {'status': 'error',
+                            'info': 'No captures of %s for year %s' % (url, year)}
+                captures_txt = response.data.decode('utf-8')
+                captures = captures_txt.strip().split("\n")
+                if captures:
+                    return {'status': 'success', 'captures': captures}
+                return {'status': 'error',
+                        'info': 'No captures of %s for year %s' % (url, year)}
+        except (ValueError, HTTPError) as exc:
+            self._log.error('invalid CDX query response (%s)', exc)
+            return {'status': 'error', 'info': str(exc)}
+        except RedisError as exc:
+            self._log.error('error connecting with Redis for url %s year %s (%s)',
+                            url, year, str(exc))
+            return {'status': 'error', 'info': str(exc)}

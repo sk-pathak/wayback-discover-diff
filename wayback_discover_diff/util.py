@@ -29,15 +29,15 @@ def load_config():
     return config
 
 
-def timestamp_simhash(redis_db, url, timestamp):
+def timestamp_simhash(redis, url, timestamp):
     """Get stored simhash data from Redis for URL and timestamp
     """
     try:
         if url and timestamp:
-            results = redis_db.hget(surt(url), timestamp)
+            results = redis.hget(surt(url), timestamp)
             if results:
                 return {'simhash': results}
-            results = redis_db.hget(surt(url), timestamp[:4])
+            results = redis.hget(surt(url), timestamp[:4])
             if results:
                 return {'status': 'error', 'message': 'NO_CAPTURES'}
             return {'status': 'error', 'message': 'CAPTURE_NOT_FOUND'}
@@ -46,12 +46,12 @@ def timestamp_simhash(redis_db, url, timestamp):
                       url, timestamp, exc)
 
 
-def year_simhash(redis_db, url, year, page=None, snapshots_per_page=None):
+def year_simhash(redis, url, year, page=None, snapshots_per_page=None):
     """Get stored simhash data for url, year and page (optional).
     """
     try:
         if url and year:
-            results = redis_db.hkeys(surt(url))
+            results = redis.hkeys(surt(url))
             if results:
                 timestamps_to_fetch = []
                 for timestamp in results:
@@ -60,7 +60,7 @@ def year_simhash(redis_db, url, year, page=None, snapshots_per_page=None):
                     if timestamp[:4] == str(year):
                         timestamps_to_fetch.append(timestamp)
                 if timestamps_to_fetch:
-                    return handle_results(redis_db, timestamps_to_fetch, url,
+                    return handle_results(redis, timestamps_to_fetch, url,
                                           snapshots_per_page, page)
             # TODO return empty result and NOT error.
             return {'status': 'error', 'message': 'NOT_CAPTURED'}
@@ -69,22 +69,21 @@ def year_simhash(redis_db, url, year, page=None, snapshots_per_page=None):
                       url, year, page, exc)
 
 
-def handle_results(redis_db, timestamps_to_fetch, url, snapshots_per_page,
+def handle_results(redis, timestamps_to_fetch, url, snapshots_per_page,
                    page=None):
     """Utility method used by `year_simhash`
     """
     available_simhashes = []
     if page:
         number_of_pages = ceil(len(timestamps_to_fetch) / snapshots_per_page)
-        if page > number_of_pages:
-            page = number_of_pages
+        page = min(page, number_of_pages)
         if number_of_pages > 0:
             timestamps_to_fetch = \
                 timestamps_to_fetch[(page - 1) * snapshots_per_page:(page * snapshots_per_page)]
         else:
             number_of_pages = 1
     try:
-        results = redis_db.hmget(surt(url), timestamps_to_fetch)
+        results = redis.hmget(surt(url), timestamps_to_fetch)
         for i, simhash in enumerate(results):
             available_simhashes.append([str(timestamps_to_fetch[i]), simhash])
         if page:

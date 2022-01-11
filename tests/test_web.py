@@ -1,7 +1,7 @@
 import json
 from redis import StrictRedis
 from werkzeug.test import Client
-from werkzeug.wrappers import BaseResponse, BaseRequest
+from werkzeug.wrappers import Response, BaseRequest
 from test_util import StubRedis
 
 from wayback_discover_diff.web import get_app
@@ -25,7 +25,7 @@ APP.redis_db = StubRedis()
 
 
 def test_simhash_parameters():
-    client = Client(APP, response_wrapper=BaseResponse)
+    client = Client(APP, response_wrapper=Response)
     resp = client.get('/simhash?timestamp=20141115130953')
     assert resp.status_code == 200
     data = json.loads(resp.data.decode('utf-8'))
@@ -48,7 +48,7 @@ def test_simhash_parameters():
 
 
 def test_no_entry():
-    client = Client(APP, response_wrapper=BaseResponse)
+    client = Client(APP, response_wrapper=Response)
     resp = client.get('/simhash?timestamp=20180000000000&url=nonexistingdomain.org')
     assert resp.status_code == 200
     data = json.loads(resp.data.decode('utf-8'))
@@ -63,7 +63,7 @@ def test_no_entry():
 
 
 def test_simhash_task_parameters():
-    client = Client(APP, response_wrapper=BaseResponse)
+    client = Client(APP, response_wrapper=Response)
     resp = client.get('/calculate-simhash?year=2018')
     assert resp.status_code == 200
     data = json.loads(resp.data.decode('utf-8'))
@@ -91,7 +91,7 @@ def test_simhash_task_parameters():
 
 
 def test_task_no_snapshots():
-    client = Client(APP, response_wrapper=BaseResponse)
+    client = Client(APP, response_wrapper=Response)
     resp = client.get('/simhash?url=nonexistingdomain.org&year=1999')
     data = json.loads(resp.data.decode('utf-8'))
     assert data == {'message': 'NO_CAPTURES', 'status': 'error'}
@@ -107,14 +107,14 @@ def test_task_no_snapshots():
 
 
 def test_root():
-    client = Client(APP, response_wrapper=BaseResponse)
+    client = Client(APP, response_wrapper=Response)
     resp = client.get('/')
     data = resp.data.decode('utf-8')
     assert data.startswith("wayback-discover-diff")
 
 
 def test_job_params():
-    client = Client(APP, response_wrapper=BaseResponse)
+    client = Client(APP, response_wrapper=Response)
     resp = client.get('/job')
     data = json.loads(resp.data.decode('utf-8'))
     assert data == dict(status='error', info='job_id param is required.')

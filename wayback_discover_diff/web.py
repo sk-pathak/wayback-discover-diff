@@ -1,6 +1,8 @@
+"""Web endpoints
+"""
 import logging
-import pkg_resources
 from time import time
+import pkg_resources
 from celery import states
 from celery.result import AsyncResult
 from celery.exceptions import CeleryError
@@ -90,9 +92,9 @@ def simhash():
         if task:
             return {'status': 'PENDING', 'captures': results}
         return {'status': 'COMPLETE', 'captures': results}
-    except ValueError as exc:
-        APP._logger.warning('Cannot get simhash of %s, (%s)', url, str(exc))
-        return {'status': 'error', 'info': 'year param must be numeric.'}
+    except (ValueError, CeleryError) as exc:
+        APP._logger.error('Cannot get simhash of %s', url, exc_info=1)
+        return {'status': 'error', 'info': 'Internal server error.'}
 
 
 @APP.route('/calculate-simhash')
@@ -120,12 +122,12 @@ def request_url():
             )
         return {'status': 'started', 'job_id': res.id}
     except CeleryError as exc:
-        APP._logger.warning('Cannot calculate simhash of %s, %s (%s)', url,
-                            year, str(exc))
+        APP._logger.warning('Cannot calculate simhash of %s, %s', url,
+                            year, exc_info=1)
         return {'status': 'error', 'info': 'Cannot start calculation.'}
     except ValueError as exc:
-        APP._logger.warning('Cannot calculate simhash of %s, no year (%s)',
-                            url, str(exc))
+        APP._logger.warning('Cannot calculate simhash of %s, no year',
+                            url, exc_info=1)
         return {'status': 'error', 'info': 'year param must be numeric.'}
 
 
@@ -157,5 +159,5 @@ def job_status():
             duration = 1
         return {'status': task.state, 'job_id': task.id, 'duration': duration}
     except (CeleryError, AttributeError) as exc:
-        APP._logger.error('Cannot get job status of %s, (%s)', job_id, str(exc))
+        APP._logger.error('Cannot get job status of %s', job_id, exc_info=1)
         return {'status': 'error', 'info': 'Cannot get status.'}

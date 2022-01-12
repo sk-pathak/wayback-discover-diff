@@ -118,7 +118,7 @@ class Discover(Task):
 
     def download_capture(self, ts):
         """Download capture data from the WBM and update job status. Return
-        data only when its text or html. If not, increment download_errors
+        data only when its text or html. On download error, increment download_errors
         which will stop the task after 10 errors. Fetch data up to a limit
         to avoid getting too much (which is unnecessary) and have a consistent
         operation time.
@@ -136,9 +136,9 @@ class Discover(Task):
                 if "text" in ctype or "html" in ctype:
                     return data
         except HTTPError as exc:
-            self._log.warning('cannot fetch capture %s %s (%s)', ts, self.url,
-                              str(exc))
-        self.download_errors += 1
+            self.download_errors += 1
+            self._log.error('cannot fetch capture %s %s', ts, self.url,
+                            exc_info=1)
         return None
 
     def start_profiling(self, snapshot, index):
@@ -163,7 +163,8 @@ class Discover(Task):
             return (timestamp, simhash_enc)
 
         if self.download_errors >= self.max_download_errors:
-            self._log.error('Too many download errors, exiting')
+            self._log.error('%d consecutive download errors fetching %s captures',
+                            self.download_errors, self.url)
             return None
 
         response_data = self.download_capture(timestamp)
@@ -230,8 +231,8 @@ class Discover(Task):
                 self.redis.hmset(urlkey, final_results)
                 self.redis.expire(urlkey, self.simhash_expire)
             except RedisError as exc:
-                self._log.error('cannot write simhashes to Redis for URL %s (%s)',
-                                self.url, str(exc))
+                self._log.error('cannot write simhashes to Redis for URL %s',
+                                self.url, exc_info=1)
 
         duration = (datetime.now() - time_started).seconds
         self._log.info('Simhash calculation finished in %.2fsec.', duration)
@@ -269,9 +270,10 @@ class Discover(Task):
                 return {'status': 'error',
                         'info': 'No captures of %s for year %s' % (url, year)}
         except (ValueError, HTTPError) as exc:
-            self._log.error('invalid CDX query response (%s)', exc)
+            self._log.error('invalid CDX query response for %s %s', url, year,
+                            exc_info=1)
             return {'status': 'error', 'info': str(exc)}
         except RedisError as exc:
-            self._log.error('error connecting with Redis for url %s year %s (%s)',
-                            url, year, str(exc))
+            self._log.error('error connecting with Redis for url %s year %s',
+                            url, year, exc_info=1)
             return {'status': 'error', 'info': str(exc)}

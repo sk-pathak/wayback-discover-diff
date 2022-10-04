@@ -105,9 +105,7 @@ class Discover(Task):
                                                retries=4, headers=headers)
         self.redis = StrictRedis(
             connection_pool=BlockingConnectionPool.from_url(
-                cfg['redis_uri'], max_connections=50,
-                timeout=cfg.get('redis_timeout', 10),
-                decode_responses=True
+                **cfg['redis']
                 )
             )
         self.tpool = ThreadPoolExecutor(max_workers=cfg['threads'])

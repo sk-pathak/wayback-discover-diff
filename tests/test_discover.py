@@ -90,7 +90,11 @@ CFG = {
         'size': 256,
         'expire_after': 86400
         },
-    'redis_uri': 'redis://localhost:6379/1',
+    'redis': {
+        'url': 'redis://localhost:6379/1',
+        'decode_responses': True,
+        'timeout': 10
+        },
     'threads': 5,
     'snapshots': {
         'number_per_year': -1,

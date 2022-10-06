@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import logging
 import string
+from time import time
 from datetime import datetime
 import cProfile
 import base64
@@ -18,7 +19,7 @@ from surt import surt
 from selectolax.parser import HTMLParser
 from werkzeug.urls import url_fix
 
-from .stats import statsd_incr
+from .stats import statsd_incr, statsd_timing
 
 # https://urllib3.readthedocs.io/en/latest/advanced-usage.html#ssl-warnings
 urllib3.disable_warnings()
@@ -189,6 +190,8 @@ class Discover(Task):
         time_started = datetime.now()
         self._log.info('Start calculating simhashes.')
         self.download_errors = 0
+
+        statsd_timing('task-wait', time() - created)
         if not self.url:
             self._log.error('did not give url parameter')
             return {'status': 'error', 'info': 'URL is required.'}

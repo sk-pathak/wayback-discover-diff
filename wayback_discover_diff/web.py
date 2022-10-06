@@ -117,8 +117,7 @@ def request_url():
         if task:
             return {'status': 'PENDING', 'job_id': task['id']}
         res = APP.celery.tasks['Discover'].apply_async(
-            args=[url, year],
-            kwargs=dict(created=time())
+            args=[url, year, time()]
             )
         return {'status': 'started', 'job_id': res.id}
     except CeleryError as exc:

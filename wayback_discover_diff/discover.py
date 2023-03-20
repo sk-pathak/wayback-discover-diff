@@ -103,7 +103,8 @@ class Discover(Task):
             headers['cookie'] = 'cdx_auth_token=%s' % cdx_auth_token
 
         self.http = urllib3.HTTPConnectionPool('web.archive.org', maxsize=50,
-                                               retries=4, headers=headers)
+                                               retries=2, timeout=20,
+                                               headers=headers)
         self.redis = StrictRedis(
             connection_pool=BlockingConnectionPool.from_url(
                 **cfg['redis']
@@ -134,10 +135,10 @@ class Discover(Task):
                 ctype = ctype.lower()
                 if "text" in ctype or "html" in ctype:
                     return data
-        except HTTPError as exc:
+        except HTTPError:
             self.download_errors += 1
-            self._log.error('cannot fetch capture %s %s', ts, self.url,
-                            exc_info=1)
+            statsd_incr('download-error')
+            self._log.error('cannot fetch capture %s %s', ts, self.url, exc_info=1)
         return None
 
     def start_profiling(self, snapshot, index):
@@ -162,6 +163,7 @@ class Discover(Task):
             return (timestamp, simhash_enc)
 
         if self.download_errors >= self.max_download_errors:
+            statsd_incr('multiple-consecutive-errors')
             self._log.error('%d consecutive download errors fetching %s captures',
                             self.download_errors, self.url)
             return None
@@ -236,6 +238,7 @@ class Discover(Task):
                                 self.url, exc_info=1)
 
         duration = (datetime.now() - time_started).seconds
+        statsd_timing('task-duration', duration)
         self._log.info('Simhash calculation finished in %.2fsec.', duration)
         return {'duration': str(duration)}
 

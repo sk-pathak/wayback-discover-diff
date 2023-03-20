@@ -9,7 +9,7 @@ if sys.version_info < (3, 8):
 
 setup(
     name='wayback-discover-diff',
-    version='0.1.9.3',
+    version='0.1.9.4',
     description='Calculate wayback machine captures simhash',
     packages=find_packages(),
     zip_safe=False,

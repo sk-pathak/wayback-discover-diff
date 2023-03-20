@@ -23,7 +23,7 @@ if isinstance(stats_conf, dict):
     stats.configure(**stats_conf)
 
 # Init Celery app
-CELERY = Celery(config_source=CFG['celery'])
+CELERY = Celery(**CFG['celery'])
 CELERY.register_task(Discover(CFG))
 
 # Init Flask app

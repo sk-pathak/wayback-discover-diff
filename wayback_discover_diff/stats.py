@@ -20,7 +20,7 @@ def configure(host, port):
     try:
         STATSD_CLIENT = statsd.StatsClient(host=host, port=port, prefix=prefix)
         _logger.info('configured statsd client %s %s %s', host, port, prefix)
-    except socket.error as exc:
+    except OSError as exc:
         _logger.error('cannot connect to statsd server %s %s %s (%s)', host,
                       port, prefix, str(exc))
 

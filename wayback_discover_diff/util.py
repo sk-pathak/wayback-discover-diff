@@ -21,10 +21,10 @@ def load_config():
         if not cfg_file:
             cfg_file = os.getcwd() + '/conf.yml'
             logging.warning('using default configuration from %s', cfg_file)
-        with open(cfg_file, 'rt') as cfg:
+        with open(cfg_file) as cfg:
             config = yaml.safe_load(cfg)
             logging.debug('config=%s', config)
-    except IOError:
+    except OSError:
         logging.error('Error loading configuration', exc_info=1)
     return config
 

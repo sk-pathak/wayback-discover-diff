@@ -125,7 +125,7 @@ class Discover(Task):
         try:
             statsd_incr('download-capture')
             self._log.info('fetching capture %s %s', ts, self.url)
-            res = self.http.request('GET', '/web/%sid_/%s' % (ts, self.url),
+            res = self.http.request('GET', '/web/{}id_/{}'.format(ts, self.url),
                                     preload_content=False)
             data = res.read(self.max_capture_download)
             ctype = res.headers.get('content-type')
@@ -200,7 +200,7 @@ class Discover(Task):
             return {'status': 'error', 'info': 'Year is required.'}
         # fetch captures
         self.update_state(state='PENDING',
-                          meta={'info': 'Fetching %s captures for year %s' % (
+                          meta={'info': 'Fetching {} captures for year {}'.format(
                                 url, year)})
         resp = self.fetch_cdx(url, year)
         if resp.get('status') == 'error':
@@ -263,13 +263,13 @@ class Discover(Task):
                     self.redis.hset(urlkey, year, -1)
                     self.redis.expire(urlkey, self.simhash_expire)
                     return {'status': 'error',
-                            'info': 'No captures of %s for year %s' % (url, year)}
+                            'info': 'No captures of {} for year {}'.format(url, year)}
                 captures_txt = response.data.decode('utf-8')
                 captures = captures_txt.strip().split("\n")
                 if captures:
                     return {'status': 'success', 'captures': captures}
                 return {'status': 'error',
-                        'info': 'No captures of %s for year %s' % (url, year)}
+                        'info': 'No captures of {} for year {}'.format(url, year)}
         except (ValueError, HTTPError) as exc:
             self._log.error('invalid CDX query response for %s %s', url, year,
                             exc_info=1)

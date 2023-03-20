@@ -33,7 +33,7 @@ def get_active_task(url, year):
         pending = APP.celery.control.inspect().active()
         if pending:
             for task in list(pending.values())[0]:
-                if task['args'] == "['%s', '%s']" % (url, year):
+                if task['args'] == "['{}', '{}']".format(url, year):
                     return task
         return None
     except RedisError:

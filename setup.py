@@ -2,30 +2,31 @@ import sys
 from setuptools import setup, find_packages
 
 
-if sys.version_info < (3, 8):
-    raise RuntimeError("Python version is {}. Requires 3.8 or greater."
+if sys.version_info < (3, 10):
+    raise RuntimeError("Python version is {}. Requires 3.10 or greater."
                        "".format(sys.version_info))
 
 
 setup(
     name='wayback-discover-diff',
-    version='0.1.9.4',
+    version='0.1.9.5',
     description='Calculate wayback machine captures simhash',
     packages=find_packages(),
     zip_safe=False,
     install_requires=[
-        'Flask>=2.2.2',
+        'Werkzeug<3',
+        'Flask>=2.1.3,<2.2.0',
         'simhash>=2.1.2',
-        'urllib3>=1.25.9',
-        'PyYAML>=5.4.1,<6.0',
+        'urllib3==1.26.16',
+        'PyYAML>=6',
         # required for Celery
-        'celery==5.2.7',
-        'kombu>=5.2.3,<6.0',
-        'redis==4.4.2',
+        'celery==5.4.0',
+        'kombu>=5.3.4,<6.0',
+        'redis==4.6.0',
 
         'hiredis',
         'flask-cors',
-        'selectolax>=0.3.11',
+        'selectolax>=0.3.21',
         'statsd',
         'surt'
         ],

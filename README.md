@@ -1,6 +1,6 @@
 # wayback-discover-diff
 
-A Python 3.8+ application running a web service that accepts HTTP GET requests and returns JSON:
+A Python 3.10+ application running a web service that accepts HTTP GET requests and returns JSON:
 
 - `/calculate-simhash?url={URL}&year={YEAR}`
 
@@ -61,7 +61,7 @@ A Python 3.8+ application running a web service that accepts HTTP GET requests a
   
 ## Installing
 
-Using conda or another Python environment management system, select Python 3.4 to create a virtualenv and activate it:
+Using conda or another Python environment management system, select Python 3.10 to create a virtualenv and activate it:
 ```Shell
 python -m venv venv
 . venv/bin/activate

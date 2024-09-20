@@ -109,8 +109,8 @@ def test_worker_download(Redis):
     # This capture performs redirects inside WBM. It has CDX status=200 but
     # its really a redirect (This is a common WBM issue). We test that
     # redirects work fine.
-    task.url = 'http://era.artiste.universalmusic.fr/'
-    assert task.download_capture('20180716140623')
+    task.url = 'https://iskme.org'
+    assert task.download_capture('20190103133511')
 
 
 def test_regular_hash():

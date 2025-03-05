@@ -3,7 +3,7 @@ simhash:
     expire_after: 86400
 
 redis:
-    uri: "redis://localhost:6379/1"
+    url: "redis://localhost:6379/1"
     decode_responses: True
     health_check_interval: 30
     max_connections: 100
@@ -53,7 +53,7 @@ logging:
   loggers:
     wayback_discover_diff.web:
       handlers: [console]
-	  level: DEBUG
+      level: DEBUG
     wayback_discover_diff.worker:
       handlers: [console]
-	  level: DEBUG
+      level: DEBUG

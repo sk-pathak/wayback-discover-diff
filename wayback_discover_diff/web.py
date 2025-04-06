@@ -27,14 +27,16 @@ def get_app(config):
 
 
 def get_active_task(url, year):
-    """Check for current simhash processing tasks for targe url & year
+    """Check for current simhash processing tasks for target url & year
     """
     try:
         pending = APP.celery.control.inspect().active()
         if pending:
-            for task in list(pending.values())[0]:
-                if task['args'] == "['{}', '{}']".format(url, year):
-                    return task
+            for _, tasks in pending.items():
+                for task in tasks:
+                    args = task['args']
+                    if len(args) >= 2 and args[0] == url and args[1] == year:
+                        return task
         return None
     except RedisError:
         # Redis connection timeout is quite common in production Celery.
